@@ -17,12 +17,12 @@
         }                                                                                           \
     } while(0)
 
-typedef struct stack {
+typedef struct vector {
     void* data;
     size_t elem_size;
     size_t capacity;
     size_t size;
-} stack_t;
+} vector_t;
 
 // stack_t*    stack_new   (size_t elem_size);
 // int         stack_push  (stack_t* stack, const void* elem);
@@ -33,7 +33,7 @@ typedef struct stack {
 // int         stack_empty (const stack_t*st);
 
 // LOCAL
-int         stack_resize_(stack_t* stack);
+int         vector_resize_(vector_t* stack);
 
 // static void print_double(const void *st) {
 //    printf("%lg", *(const double *)st);
@@ -61,10 +61,10 @@ int         stack_resize_(stack_t* stack);
 
 
 #define START_CAPACITY_ 2
-stack_t* stack_new(size_t elem_size) {
+vector_t* vector_new(size_t elem_size) {
     assert(elem_size);
 
-    stack_t* stack = (stack_t*)calloc(1, sizeof(stack_t));
+    vector_t* stack = (vector_t*)calloc(1, sizeof(vector_t));
 
     if (!stack) {
         return NULL;
@@ -83,11 +83,11 @@ stack_t* stack_new(size_t elem_size) {
 }
 #undef START_CAPACITY_
 
-int stack_push(stack_t* stack, const void* elem) {
+int vector_push(vector_t* stack, const void* elem) {
     assert(stack);
     assert(elem);
 
-    ERROR_HANDLE(stack_resize_(stack));
+    ERROR_HANDLE(vector_resize_(stack));
 
     if (!memcpy((char*)stack->data + stack->size * stack->elem_size, elem, stack->elem_size)) {
         return EXIT_FAILURE;
@@ -97,7 +97,7 @@ int stack_push(stack_t* stack, const void* elem) {
     return EXIT_SUCCESS;
 }
 
-int stack_top(stack_t* stack, void* elem) {
+int vector_top(vector_t* stack, void* elem) {
     assert(stack);
     assert(elem);
 
@@ -108,23 +108,23 @@ int stack_top(stack_t* stack, void* elem) {
     return EXIT_SUCCESS;
 }
 
-int stack_pop(stack_t* stack, void* elem) {
+int vector_pop(vector_t* stack, void* elem) {
     assert(stack);
     assert(elem);
 
-    ERROR_HANDLE(stack_top(stack, elem));
+    ERROR_HANDLE(vector_top(stack, elem));
     --stack->size;
 
     return EXIT_SUCCESS;
 }
 
-int stack_empty(const stack_t* stack) {
+int vector_empty(const vector_t* stack) {
     assert(stack);
 
     return stack->size == 0;
 }
 
-stack_t* stack_delete(stack_t* stack) {
+vector_t* vector_delete(vector_t* stack) {
     assert(stack);
 
     free(stack->data);
@@ -133,7 +133,7 @@ stack_t* stack_delete(stack_t* stack) {
     return NULL;
 }
 
-void stack_print(const stack_t* stack, void (*pf)(const void* st)) {
+void vector_print(const vector_t* stack, void (*pf)(const void* st)) {
     assert(stack);
     assert(pf);
 
@@ -150,7 +150,7 @@ void stack_print(const stack_t* stack, void (*pf)(const void* st)) {
     printf("]\n");
 }
 
-int stack_resize_(stack_t* stack) {
+int vector_resize_(vector_t* stack) {
     assert(stack);
 
     if (stack->size == stack->capacity) {

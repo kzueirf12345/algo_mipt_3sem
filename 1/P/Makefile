@@ -3,7 +3,7 @@
 		clean_all clean_log clean_out clean_obj clean_deps clean_txt clean_bin \
 
 
-PROJECT_NAME = L
+PROJECT_NAME = P
 
 BUILD_DIR = ./build
 SRC_DIR = ./src

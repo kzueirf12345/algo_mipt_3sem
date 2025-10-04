@@ -2,45 +2,41 @@
 #include <stdio.h>
 #include <assert.h>
 #include <stdlib.h>
-#include <errno.h>
 #include <string.h>
-
-#pragma GCC optimize("O3,unroll-loops")
-#pragma GCC target("avx2")
 
 #define ERROR_HANDLE(call_func, ...)                                                                \
     do {                                                                                            \
         int error_handler = call_func;                                                              \
         if (error_handler)                                                                          \
         {                                                                                           \
-            fprintf(stderr, "Can't " #call_func". Errno: %d\n",                                     \
-                            errno);                                                                 \
-            __VA_ARGS__                                                                             \
             return error_handler;                                                                   \
         }                                                                                           \
     } while(0)
 
-typedef struct stack {
-    void* data;
-    size_t elem_size;
-    size_t capacity;
-    size_t size;
-} stack_t;
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 typedef struct queue {
-    stack_t* stack1;
-    stack_t* stack2;
+    void*   data;
+    size_t  elem_size;
+    size_t  head;
+    size_t  tail;
+    size_t  size;
+    size_t  capacity;
 } queue_t;
 
-// queue_t*    queue_new   (size_t elem_size);
-// int         queue_push  (queue_t* q, const void* elem);
-// int         queue_pop   (queue_t* q, void* elem);
-// int         queue_empty (const queue_t* q); 
-// queue_t*    queue_delete(queue_t* q);
-// void        queue_print (const queue_t* q, void (*pf)(const void* data)); 
+// LOCAL
+int queue_realloc_(queue_t* queue, size_t new_capacity);
 
-// static void print_double(const void* q) {
-//    printf("%lg", *(const double*)q);
+// struct queue *queue_new(size_t elem_size);
+// int queue_push(struct queue *q, const void *elem);
+// int queue_pop (struct queue *q, void *elem); 
+// int queue_empty(struct queue const *q); 
+// struct queue *queue_delete(struct queue *q); 
+// void queue_print(struct queue const *q, void (*pf)(void const *data)); 
+
+// static void print_double(void const *data) {
+//    printf("%lg", *(const double *)data);
 // }
 
 // int main() {
@@ -55,142 +51,14 @@ typedef struct queue {
 //         queue_pop(q, &tmp);
 //         printf("%lg\n", tmp);
 //     }                                                                                                                                                                                        
- 
 //     q = queue_delete(q);
 // }
 
-
-// LOCAL
-int         stack_resize_(stack_t* stack);
-stack_t*    stack_new    (size_t elem_size);
-int         stack_push   (stack_t* stack, const void* elem);
-int         stack_pop    (stack_t* stack, void* elem); 
-stack_t*    stack_delete (stack_t* stack); 
-void        stack_print  (const stack_t* stack, void (*pf)(const void* st));
-int         stack_top    (stack_t* stack, void* elem); 
-int         stack_empty  (const stack_t* st);
-
-
-#define START_CAPACITY_ 2
-stack_t* stack_new(size_t elem_size) {
-    assert(elem_size);
-
-    stack_t* stack = (stack_t*)calloc(1, sizeof(stack_t));
-
-    if (!stack) {
-        return NULL;
-    }
-
-    stack->elem_size    = elem_size;
-    stack->capacity     = START_CAPACITY_; 
-    stack->size         = 0;
-    stack->data         = calloc(stack->capacity, stack->elem_size);
-
-    if (!stack->data) {
-        return NULL;
-    }
-
-    return stack;
-}
-#undef START_CAPACITY_
-
-int stack_push(stack_t* stack, const void* elem) {
-    assert(stack);
-    assert(elem);
-
-    ERROR_HANDLE(stack_resize_(stack));
-
-    if (!memcpy((char*)stack->data + stack->size * stack->elem_size, elem, stack->elem_size)) {
-        return EXIT_FAILURE;
-    }
-    ++stack->size;
-
-    return EXIT_SUCCESS;
-}
-
-int stack_empty(const stack_t* stack) {
-    assert(stack);
-
-    return stack->size == 0;
-}
-
-int stack_top(stack_t* stack, void* elem) {
-    assert(stack);
-    assert(elem);
-
-    if (stack_empty(stack)) {
-        return EXIT_FAILURE;
-    }
-
-    if (!memcpy(elem, (char*)stack->data + (stack->size - 1) * stack->elem_size, stack->elem_size)) {
-        return EXIT_FAILURE;
-    }
-
-    return EXIT_SUCCESS;
-}
-
-int stack_pop(stack_t* stack, void* elem) {
-    assert(stack);
-    assert(elem);
-
-    if (stack_empty(stack)) {
-        return EXIT_FAILURE;
-    }
-
-    ERROR_HANDLE(stack_top(stack, elem));
-    --stack->size;
-
-    return EXIT_SUCCESS;
-}
-
-stack_t* stack_delete(stack_t* stack) {
-    assert(stack);
-
-    free(stack->data);
-    free(stack);
-
-    return NULL;
-}
-
-void stack_print(const stack_t* stack, void (*pf)(const void* st)) {
-    assert(stack);
-    assert(pf);
-
-    printf("[");
-
-    size_t num = 0;
-    for (; num + 1 < stack->size; ++num) {
-        pf((char*)stack->data + num * stack->elem_size);
-        printf(", ");
-    }
-    if (stack->size > 0) {
-        pf((char*)stack->data + num * stack->elem_size);
-    }
-    printf("]\n");
-}
-
-int stack_resize_(stack_t* stack) {
-    assert(stack);
-
-    if (stack->size == stack->capacity) {
-        stack->capacity = 2 * stack->capacity;
-
-        if (!(stack->data = realloc(stack->data, stack->capacity * stack->elem_size))) {
-            return EXIT_FAILURE;
-        }
-    } else if (2 * stack->size < stack->capacity && stack->capacity > 1) {
-        stack->capacity = stack->capacity / 2;
-
-        if (!(stack->data = realloc(stack->data, stack->capacity * stack->elem_size))) {
-            return EXIT_FAILURE;
-        }
-    }
-
-    return EXIT_SUCCESS;
-}
-
+#define MIN_CAPACITY_ 8
 queue_t* queue_new(size_t elem_size) {
-    assert(elem_size);
+    if (!elem_size) {
+        return NULL;
+    }
 
     queue_t* queue = (queue_t*)calloc(1, sizeof(queue_t));
 
@@ -198,84 +66,116 @@ queue_t* queue_new(size_t elem_size) {
         return NULL;
     }
 
-    queue->stack1 = stack_new(elem_size);
+    queue->elem_size = elem_size;
+    queue->head      = 0;
+    queue->tail      = 0;
+    queue->size      = 0;
+    queue->capacity  = MIN_CAPACITY_;
 
-    if (!queue->stack1) {
-        return NULL;
-    }
+    queue->data = calloc(queue->capacity, queue->elem_size);
 
-    queue->stack2 = stack_new(elem_size);
-
-    if (!queue->stack2) {
+    if (!queue->data) {
+        free(queue);
         return NULL;
     }
 
     return queue;
 }
+#undef MIN_CAPACITY_
 
-int queue_swap_stacks_(queue_t* q);
-
-int queue_swap_stacks_(queue_t* q) {
-    assert(q);
-
-    void* swap_elem = calloc(1, q->stack1->elem_size);
-    while (!stack_empty(q->stack1)) {
-        ERROR_HANDLE(stack_pop (q->stack1, swap_elem));
-        ERROR_HANDLE(stack_push(q->stack2, swap_elem));
-    }
-    free(swap_elem);
-
-    return EXIT_SUCCESS;
-}
-
-int queue_push(queue_t* q, const void* elem) {
-    assert(q);
-    assert(elem);
-
-    ERROR_HANDLE(stack_push(q->stack1, elem));
-
-    return EXIT_SUCCESS;
-}
-
-int queue_pop(queue_t* q, void* elem) {
-    assert(q);
-
-    if (!stack_empty(q->stack2)) {
-        ERROR_HANDLE(stack_pop(q->stack2, elem));
-
-        return EXIT_SUCCESS;
-    }
-
-    ERROR_HANDLE(queue_swap_stacks_(q));
-
-    if (stack_empty(q->stack2)) {
+int queue_realloc_(queue_t* queue, size_t new_capacity) {
+    if (!queue) {
         return EXIT_FAILURE;
     }
-    
-    ERROR_HANDLE(stack_pop(q->stack2, elem));
+
+    void* new_data = calloc(new_capacity, queue->elem_size);
+
+    if (!new_data) {
+        return EXIT_FAILURE;
+    }
+
+    for (size_t i = 0; i < queue->size; ++i) {
+        size_t src_index = (queue->head + i) % queue->capacity;
+        char* dst = (char*)new_data + i * queue->elem_size;
+        char* src = (char*)queue->data + src_index * queue->elem_size;
+        memcpy(dst, src, queue->elem_size);
+    }
+
+    free(queue->data);
+    queue->data     = new_data;
+    queue->capacity = new_capacity;
+    queue->head     = 0;
+    queue->tail     = queue->size;
 
     return EXIT_SUCCESS;
 }
 
-int queue_empty(const queue_t* q) {
-    return stack_empty(q->stack1) && stack_empty(q->stack2);
+int queue_push(queue_t* queue, const void* elem) {
+    if (!queue || !elem) {
+        return EXIT_FAILURE;
+    }
+
+    if (queue->size >= queue->capacity) {
+        ERROR_HANDLE(queue_realloc_(queue, 2 * queue->capacity));
+    }
+
+    memcpy((char*)queue->data + queue->tail * queue->elem_size, elem, queue->elem_size);
+
+    queue->tail = (queue->tail + 1) % queue->capacity;
+    ++queue->size;
+
+    return EXIT_SUCCESS;
 }
 
-void queue_print(const queue_t* q, void (*pf)(const void* data)) {
-    assert(q);
-    assert(pf);
+int queue_pop(queue_t* queue, void* elem) {
+    if (!queue || !elem) {
+        return EXIT_FAILURE;
+    }
 
-    queue_swap_stacks_((queue_t*)q);
+    if (queue->size == 0) {
+        return EXIT_FAILURE;
+    }
 
-    stack_print(q->stack2, pf);
+    memcpy(elem, (char*)queue->data + queue->head * queue->elem_size, queue->elem_size);
+
+    queue->head = (queue->head + 1) % queue->capacity;
+    --queue->size;
+
+    return EXIT_SUCCESS;
 }
 
-queue_t* queue_delete(queue_t* q) {
-    assert(q);
+int queue_empty(const queue_t* queue) {
+    return queue->size == 0;
+}
 
-    stack_delete(q->stack1);
-    stack_delete(q->stack2);
-    free(q);
+queue_t* queue_delete(queue_t* queue) {
+    if (!queue) {
+        return NULL;
+    }
+
+    free(queue->data);
+    free(queue);
 
     return NULL;
+}
+
+void queue_print(const queue_t* queue, void (*pf)(const void* data)) {
+    if (!queue || !pf) {
+        printf("[]\n");
+        return;
+    }
+
+    printf("[");
+
+    for (size_t i = 0; i < queue->size; ++i) {
+        size_t index = (queue->tail - 1 - i + queue->capacity) % queue->capacity;   
+        char* elem_ptr = (char*)queue->data + index * queue->elem_size;
+        pf(elem_ptr);
+        
+        if (i < queue->size - 1) {
+            printf(", ");
+        }
+    }
+    
+    printf("]\n");
 }

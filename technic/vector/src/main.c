@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <assert.h>
 #include <stdlib.h>
-#include <errno.h>
 #include <string.h>
 
 #define ERROR_HANDLE(call_func, ...)                                                                \
@@ -10,9 +9,6 @@
         int error_handler = call_func;                                                              \
         if (error_handler)                                                                          \
         {                                                                                           \
-            fprintf(stderr, "Can't " #call_func". Errno: %d\n",                                     \
-                            errno);                                                                 \
-            __VA_ARGS__                                                                             \
             return error_handler;                                                                   \
         }                                                                                           \
     } while(0)
@@ -23,6 +19,10 @@ typedef struct vector {
     size_t capacity;
     size_t size;
 } vector_t;
+
+//LOCAl
+int vector_top_(vector_t* vector, void* elem);
+int vector_resize_(vector_t* vector, size_t new_size);
 
 // struct vector *vector_new(size_t elems, size_t elem_size);
 // int vector_push(struct vector *v, void const *elem);
@@ -41,8 +41,11 @@ typedef struct vector {
 
 // int main() {
 //     struct vector *v = vector_new(10, sizeof(int));
+//     // for (size_t i = 0; i < 10; i++) {
+//     //     vector_set(v, i, &i);
+//     // }
 //     for (size_t i = 0; i < 10; i++) {
-//         vector_set(v, i, &i);
+//         vector_push(v, &i);
 //     }
 //     vector_print(v, print_int);
 //     v = vector_delete(v);
@@ -50,7 +53,9 @@ typedef struct vector {
 
 
 vector_t* vector_new(size_t elems, size_t elem_size) {
-    assert(elem_size);
+    if (!elem_size) {
+        return NULL;
+    }
 
     vector_t* vector = (vector_t*)calloc(1, sizeof(vector_t));
 
@@ -60,7 +65,7 @@ vector_t* vector_new(size_t elems, size_t elem_size) {
 
     vector->elem_size    = elem_size;
     vector->capacity     = elems; 
-    vector->size         = elems;
+    vector->size         = 0;
     vector->data         = calloc(vector->capacity, vector->elem_size);
 
     if (!vector->data) {
@@ -70,12 +75,42 @@ vector_t* vector_new(size_t elems, size_t elem_size) {
     return vector;
 }
 
+int vector_resize(vector_t* vector, size_t new_size) {
+    if (!vector) {
+        return EXIT_FAILURE;
+    }
+
+    // vector->size     = new_size;
+    vector->capacity = new_size;
+
+    if (!(vector->data = realloc(vector->data, vector->capacity * vector->elem_size))) {
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
+
+int vector_resize_(vector_t* vector, size_t new_size) {
+    if (!vector) {
+        return EXIT_FAILURE;
+    }
+
+    vector->capacity = new_size;
+
+    if (!(vector->data = realloc(vector->data, vector->capacity * vector->elem_size))) {
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
+
 int vector_push(vector_t* vector, const void* elem) {
-    assert(vector);
-    assert(elem);
+    if (!vector || !elem) {
+        return EXIT_FAILURE;
+    }
 
     if (vector->size == vector->capacity) {
-        ERROR_HANDLE(vector_resize(vector, 2 * vector->capacity));
+        ERROR_HANDLE(vector_resize_(vector, 2 * vector->capacity));
     }
 
     if (!memcpy((char*)vector->data + vector->size * vector->elem_size, elem, vector->elem_size)) {
@@ -86,27 +121,41 @@ int vector_push(vector_t* vector, const void* elem) {
     return EXIT_SUCCESS;
 }
 
-int vector_pop(vector_t* vector, void* elem) {
-    assert(vector);
-    assert(elem);
-    assert(vector->size);
+int vector_empty(const vector_t* vector) {
+    return vector->size == 0;
+}
+
+int vector_top_(vector_t* vector, void* elem) {
+    if (!vector || !elem) {
+        return EXIT_FAILURE;
+    }
+
+    if (vector_empty(vector)) {
+        return EXIT_FAILURE;
+    }
 
     if (!memcpy(elem, (char*)vector->data + (vector->size - 1) * vector->elem_size, vector->elem_size)) {
         return EXIT_FAILURE;
     }
+
+    return EXIT_SUCCESS;
+}
+
+int vector_pop(vector_t* vector, void* elem) {
+    if (!vector || !elem) {
+        return EXIT_FAILURE;
+    }
+
+    ERROR_HANDLE(vector_top_(vector, elem));
     --vector->size;
 
     return EXIT_SUCCESS;
 }
 
-int vector_empty(const vector_t* vector) {
-    assert(vector);
-
-    return vector->size == 0;
-}
-
 vector_t* vector_delete(vector_t* vector) {
-    assert(vector);
+    if (!vector) {
+        return NULL;
+    }
 
     free(vector->data);
     free(vector);
@@ -115,8 +164,9 @@ vector_t* vector_delete(vector_t* vector) {
 }
 
 void vector_print(const vector_t* vector, void (*pf)(const void* st)) {
-    assert(vector);
-    assert(pf);
+    if (!vector || !pf) {
+        return;
+    }
 
     printf("[");
 
@@ -131,23 +181,11 @@ void vector_print(const vector_t* vector, void (*pf)(const void* st)) {
     printf("]\n");
 }
 
-int vector_resize(vector_t* vector, size_t new_size) {
-    assert(vector);
-    assert(new_size);
-
-    vector->capacity = new_size;
-    if (!(vector->data = realloc(vector->data, vector->capacity))) {
-        return EXIT_FAILURE;
-    }
-
-    return EXIT_SUCCESS;
-}
-
 int vector_set(vector_t* vector, size_t index, const void* elem)
 {
-    assert(vector);
-    assert(elem);
-    assert(index < vector->size);
+    if (!vector || !elem) {
+        return EXIT_FAILURE;
+    }
 
     if (!memcpy((char*)vector->data + index * vector->elem_size, elem, vector->elem_size)) {
         return EXIT_FAILURE;
@@ -158,9 +196,9 @@ int vector_set(vector_t* vector, size_t index, const void* elem)
 
 int vector_get(const vector_t* vector, size_t index, void* elem)
 {
-    assert(vector);
-    assert(elem);
-    assert(index < vector->size);
+    if (!vector || !elem) {
+        return EXIT_FAILURE;
+    }
 
     if (!memcpy(elem, (char*)vector->data + index * vector->elem_size, vector->elem_size)) {
         return EXIT_FAILURE;
@@ -170,6 +208,8 @@ int vector_get(const vector_t* vector, size_t index, void* elem)
 }
 
 size_t vector_size(const vector_t* vector) {
-    assert(vector);
+    if (!vector) {
+        return 0;
+    }
     return vector->size;
 }

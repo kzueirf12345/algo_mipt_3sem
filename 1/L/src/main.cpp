@@ -1,21 +1,24 @@
-#include <algorithm>
 #include <iostream>
 #include <vector>
 
-void init(std::vector<size_t>& arr);
 void intersect(const std::vector<size_t>& arr1, const std::vector<size_t>& arr2, std::vector<size_t>& res);
 
 
 int main()
 {
-    std::vector<size_t> arr1;
-    std::vector<size_t> arr2;
+    size_t n = 0, m = 0;
 
-    init(arr1);
-    init(arr2);
+    std::cin >> n >> m;
+    std::vector<size_t> arr1(n);
+    std::vector<size_t> arr2(m);
 
-    std::sort(arr1.begin(), arr1.end());
-    std::sort(arr2.begin(), arr2.end());
+    for (size_t i = 0; i < n; ++i) {
+        std::cin >> arr1[i];
+    }
+
+    for (size_t i = 0; i < m; ++i) {
+        std::cin >> arr2[i];
+    }
 
     std::vector<size_t> res;
 
@@ -30,40 +33,19 @@ int main()
     return 0;
 }
 
-void init(std::vector<size_t>& arr) {
-    size_t num = 0;
-    while (true) {
-        std::cin >> num;
-        if (num == 0) {
-            break;
-        }
-
-        arr.push_back(num);
-    }
-}
-
 void intersect(const std::vector<size_t>& arr1, const std::vector<size_t>& arr2, std::vector<size_t>& res) {
     size_t ind1 = 0;
     size_t ind2 = 0;
 
     while (ind1 < arr1.size() && ind2 < arr2.size()) {
         if (arr1[ind1] < arr2[ind2]) {
-            res.push_back(arr1[ind1]);
             ++ind1;
         } else if (arr1[ind1] > arr2[ind2]) {
-            res.push_back( arr2[ind2] );
             ++ind2;
         } else {
+            res.push_back(arr1[ind1]);
             ++ind1;
             ++ind2;
         }
-    }
-
-    while (ind1 < arr1.size()) {
-        res.push_back(arr1[ind1++]);
-    }
-
-    while (ind2 < arr2.size()) {
-        res.push_back(arr2[ind2++]);
     }
 }

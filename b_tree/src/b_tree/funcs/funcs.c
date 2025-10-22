@@ -44,10 +44,14 @@ static enum BTreeError b_tree_dtor_rec_(b_tree_node_t* node)
 
     lassert(!is_invalid_ptr(node), "");
 
-    for (size_t child_ind = 0; child_ind < node->keys_cnt + 1; ++child_ind) 
+    if (!node->is_leaf)
     {
-        B_TREE_ERROR_HANDLE(b_tree_dtor_rec_(node->children[child_ind]));
+        for (size_t child_ind = 0; child_ind < node->keys_cnt + 1; ++child_ind) 
+        {
+            B_TREE_ERROR_HANDLE(b_tree_dtor_rec_(node->children[child_ind]));
+        }
     }
+
 
     B_TREE_ERROR_HANDLE(b_tree_node_dtor_(node));
 
@@ -77,13 +81,21 @@ static enum BTreeError b_tree_node_ctor_(b_tree_node_t** node, size_t t, bool is
         return B_TREE_ERROR_STANDARD_ERRNO;
     }
 
-    const size_t max_children_cnt = max_keys_cnt + 1;
-    (*node)->children = calloc(max_children_cnt, sizeof(*(*node)->children));
-    
-    if (!(*node)->children) {
-        fprintf(stderr, "Can't calloc node->children\n");
-        return B_TREE_ERROR_STANDARD_ERRNO;
+    if (!is_leaf)
+    {
+        const size_t max_children_cnt = max_keys_cnt + 1;
+        (*node)->children = calloc(max_children_cnt, sizeof(*(*node)->children));
+        
+        if (!(*node)->children) {
+            fprintf(stderr, "Can't calloc node->children\n");
+            return B_TREE_ERROR_STANDARD_ERRNO;
+        }
+    } 
+    else 
+    {
+        (*node)->children = NULL;
     }
+
 
     return B_TREE_ERROR_SUCCESS;
 }
@@ -101,4 +113,5 @@ static enum BTreeError b_tree_node_dtor_(b_tree_node_t* node)
 
     return B_TREE_ERROR_SUCCESS;
 }
+
 //===================================INSERT=========================================================

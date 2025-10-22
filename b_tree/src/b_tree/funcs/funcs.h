@@ -1,0 +1,6 @@
+#ifndef B_TREE_SRC_B_TREE_FUNCS_FUNCS_H
+#define B_TREE_SRC_B_TREE_FUNCS_FUNCS_H
+
+#include "b_tree/"
+
+#endif /*B_TREE_SRC_B_TREE_FUNCS_FUNCS_H*/

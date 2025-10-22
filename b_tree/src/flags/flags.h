@@ -2,7 +2,6 @@
 #define B_TREE_SRC_FLAGS_FLAGS_H
 
 #include <stdbool.h>
-#include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
 
@@ -34,9 +33,6 @@ const char* flags_strerror(const enum FlagsError error);
 typedef struct FlagsObjs
 {
     char log_folder         [FILENAME_MAX + 1];
-    char input_files        [MAX_INOUT_FILES_CNT][FILENAME_MAX + 1];
-    char output_files       [MAX_INOUT_FILES_CNT][FILENAME_MAX + 1];
-    size_t cnt_inout_files;
 
 } flags_objs_t;
 

@@ -5,8 +5,6 @@
 #include <assert.h>
 #include <errno.h>
 
-#include "concole.h"
-
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
@@ -38,6 +36,18 @@
                             errno);                                                                 \
             __VA_ARGS__                                                                             \
             return error_handler;                                                                   \
+        }                                                                                           \
+    } while(0)
+
+#define MAIN_INT_ERROR_HANDLE(call_func, ...)                                                       \
+    do {                                                                                            \
+        unsigned int error_handler = call_func;                                                     \
+        if (error_handler)                                                                          \
+        {                                                                                           \
+            fprintf(stderr, "Can't " #call_func". Errno: %d\n",                                     \
+                            errno);                                                                 \
+            __VA_ARGS__                                                                             \
+            return (int)error_handler;                                                              \
         }                                                                                           \
     } while(0)
 

@@ -5,6 +5,8 @@
 #include <assert.h>
 #include <errno.h>
 
+#define POISON (0xCEBAC0CA1)
+
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 

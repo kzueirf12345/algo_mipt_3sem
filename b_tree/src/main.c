@@ -1,19 +1,30 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "b_tree/verification/verification.h"
 #include "flags/flags.h"
 #include "logger/src/logger.h"
 #include "utils/utils.h"
+#include "b_tree/funcs/funcs.h"
 
 static unsigned init_all(flags_objs_t* const flags_objs, const int argc, char* const * argv);
 static unsigned dtor_all(flags_objs_t* const flags_objs);
 
-int main(const int argc, char* const argv[]) {
-
+int main(const int argc, char* const argv[]) 
+{
     flags_objs_t flags_objs = {};
     MAIN_INT_ERROR_HANDLE(init_all(&flags_objs, argc, argv));
     
-    printf("Hello wolrd!\n");
+    b_tree_t tree = {};
+    B_TREE_INT_ERROR_HANDLE(
+        b_tree_ctor(&tree, 100), 
+        dtor_all(&flags_objs);
+    );
+
+    B_TREE_INT_ERROR_HANDLE(
+        b_tree_dtor(&tree);
+        dtor_all(&flags_objs);
+    );
     
     MAIN_INT_ERROR_HANDLE(dtor_all(&flags_objs));
 

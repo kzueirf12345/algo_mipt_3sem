@@ -2,14 +2,15 @@
 #define B_TREE_SRC_B_TREE_B_TREE_STRUCTS_H
 
 #include <stdlib.h>
+#include <stdbool.h>
 
 typedef struct BTreeNode {
     bool is_leaf;
 
-    size_t keys_size;
-    int* keys;
+    size_t keys_cnt;
 
-    struct BTreeNode* children;
+    int* keys;
+    struct BTreeNode** children;
 } b_tree_node_t;
 
 typedef struct BTree {

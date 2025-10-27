@@ -3,8 +3,6 @@
 #include "b_tree/verification/verification.h"
 #include "utils/utils.h"
 #include "logger/src/logger.h"
-#include "utils/concole.h"
-
 //===================================CTOR DTOR======================================================
 
 static enum BTreeError b_tree_node_ctor_(b_tree_node_t** node, size_t t, bool is_leaf);
@@ -210,16 +208,19 @@ static enum BTreeError b_tree_split_child_(b_tree_node_t* parent, size_t child_i
     b_tree_node_t* new_child = NULL;
     B_TREE_ERROR_HANDLE(b_tree_node_ctor_(&new_child, t, full_child->is_leaf));
 
+    new_child->keys_cnt = t - 1;
+
     for (size_t key_ind = 0; key_ind < new_child->keys_cnt; ++key_ind) {
         new_child->keys[key_ind] = full_child->keys[key_ind + t];
     }
 
     if (!full_child->is_leaf)
     {
-        for (size_t child_ptr_ind = 0; child_ptr_ind < t; ++child_ptr_ind) {
+        for (size_t child_ptr_ind = 0; child_ptr_ind < new_child->keys_cnt + 1; ++child_ptr_ind) {
             new_child->children[child_ptr_ind] = full_child->children[child_ptr_ind + t];
         }
     }
+    full_child->keys_cnt = t - 1;
 
     for (size_t shift_ind = parent->keys_cnt; shift_ind > child_ind; --shift_ind)
         parent->children[shift_ind + 1] = parent->children[shift_ind];
@@ -230,8 +231,6 @@ static enum BTreeError b_tree_split_child_(b_tree_node_t* parent, size_t child_i
         parent->keys[shift_ind] = parent->keys[shift_ind - 1];
     parent->keys[child_ind] = full_child->keys[t - 1];
 
-    new_child->keys_cnt = t - 1;
-    full_child->keys_cnt = t - 1;
     parent->keys_cnt++;
 
     return B_TREE_ERROR_SUCCESS;

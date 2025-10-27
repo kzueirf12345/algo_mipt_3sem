@@ -61,7 +61,7 @@ CMakePresets.json
 
 # logs
 *.log
-log/*
+*log/*
 
 # tex
 *.aux
@@ -71,3 +71,9 @@ log/*
 *.gz
 *.toc
 *_minted-main
+
+# dumbs
+*dumb*.svg
+*dumb*.dot
+*dumb*.html
+*dumb_graph_count.txt

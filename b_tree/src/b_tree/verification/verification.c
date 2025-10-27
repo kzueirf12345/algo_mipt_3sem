@@ -2,7 +2,6 @@
 #include "b_tree/structs.h"
 
 #include <stdio.h>
-#include "utils/concole.h"
 
 #define CASE_ENUM_TO_STRING_(error) case error: return #error
 const char* b_tree_strerror(const enum BTreeError error)

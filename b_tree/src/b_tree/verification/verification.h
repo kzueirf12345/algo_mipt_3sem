@@ -52,7 +52,6 @@ enum BTreeError b_tree_verify(const b_tree_t* const tree);
 
 #ifndef NDEBUG
 
-// TODO DUMB
 #define B_TREE_VERIFY_ASSERT(tree)                                                                  \
         do {                                                                                        \
             const enum BTreeError error = b_tree_verify(tree);                                      \

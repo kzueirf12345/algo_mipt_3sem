@@ -46,10 +46,11 @@ FLAGS += $(ADD_FLAGS)
 
 LIBS = -lm -L./libs/logger -llogger
 
-DIRS = flags utils b_tree b_tree/funcs b_tree/verification
+DIRS = flags utils b_tree b_tree/funcs b_tree/verification b_tree/dumb
 BUILD_DIRS = $(DIRS:%=$(BUILD_DIR)/%)
 
-SOURCES = main.c b_tree/funcs/funcs.c flags/flags.c utils/utils.c b_tree/verification/verification.c
+SOURCES = main.c b_tree/funcs/funcs.c flags/flags.c utils/utils.c b_tree/verification/verification.c \
+		  b_tree/dumb/dumb.c
 
 SOURCES_REL_PATH = $(SOURCES:%=$(SRC_DIR)/%)
 OBJECTS_REL_PATH = $(SOURCES:%.c=$(BUILD_DIR)/%.o)
@@ -108,3 +109,9 @@ clean_txt:
 
 clean_bin:
 	rm -rf ./*.bin
+
+clean_dumb:
+	rm -rf ./log/*.dot
+	rm -rf ./log/*.html
+	rm -rf ./log/*.svg
+	rm ./log/dumb_graph_count.txt

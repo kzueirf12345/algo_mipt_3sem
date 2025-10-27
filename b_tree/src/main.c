@@ -6,7 +6,7 @@
 #include "logger/src/logger.h"
 #include "utils/utils.h"
 #include "b_tree/funcs/funcs.h"
-#include "utils/concole.h"
+#include "b_tree/dumb/dumb.h"
 
 static unsigned init_all(flags_objs_t* const flags_objs, const int argc, char* const * argv);
 static unsigned dtor_all(flags_objs_t* const flags_objs);
@@ -18,31 +18,28 @@ int main(const int argc, char* const argv[])
     
     b_tree_t tree = {};
     B_TREE_INT_ERROR_HANDLE(
-        b_tree_ctor(&tree, 100), 
+        b_tree_ctor(&tree, 2), 
         dtor_all(&flags_objs);
     );
 
-    // logg(LOG_LEVEL_DETAILS_ERROR, "smert");
+    const int testKeys[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39};
+    const size_t keyCount = sizeof(testKeys) / sizeof(testKeys[0]);
 
-    for (size_t i = tree.t * 2; i > 2; --i)
+    for (size_t i = 0; i < keyCount; ++i)
     {
+        fprintf(stderr, "\n=== INSERT %d ===\n", testKeys[i]);
+
         B_TREE_INT_ERROR_HANDLE(
-            b_tree_insert(&tree, (int)i),
+            b_tree_insert(&tree, testKeys[i]),
             dtor_all(&flags_objs);
         );
+
+        b_tree_dumb(&tree, NULL);
     }
-    
-    // B_TREE_INT_ERROR_HANDLE(
-    //     b_tree_insert(&tree, (int)10),
-    //     dtor_all(&flags_objs);
-    // );
-    // B_TREE_INT_ERROR_HANDLE(
-    //     b_tree_insert(&tree, (int)4),
-    //     dtor_all(&flags_objs);
-    // );
 
+    fprintf(stderr, "\nFinal tree structure dumped to dumb file.\n");
 
-    fprintf(stderr, "inserted num: %d\n", tree.root->keys[0]);
+    /* ====================================== */
 
     B_TREE_INT_ERROR_HANDLE(
         b_tree_dtor(&tree),
@@ -67,7 +64,7 @@ unsigned init_all(flags_objs_t* const flags_objs, const int argc, char* const * 
     if (logger_init(flags_objs->log_folder))
     {
         fprintf(stderr, "Can't logger init\n");
-                                                                        flags_objs_dtor(flags_objs);
+        flags_objs_dtor(flags_objs);
         return EXIT_FAILURE;
     }
 
@@ -80,6 +77,7 @@ unsigned dtor_all(flags_objs_t* const flags_objs)
 
     LOGG_ERROR_HANDLE(                                                              logger_dtor(););
     FLAGS_ERROR_HANDLE(                                               flags_objs_dtor(flags_objs););
+    B_TREE_DUMB_ERROR_HANDLE(                                                  b_tree_dumb_dtor(););
 
     return EXIT_SUCCESS;
 }
@@ -97,9 +95,19 @@ unsigned logger_init(char* const log_folder)
         return EXIT_FAILURE;
     }
 
+    char dumb_filename[FILENAME_MAX] = {};
+    if (snprintf(dumb_filename, FILENAME_MAX, "%s%s", log_folder, DUMB_FILENAME) <= 0)
+    {
+        perror("Can't snprintf dumb_filename");
+        return EXIT_FAILURE;
+    }
+
     LOGG_ERROR_HANDLE(logger_ctor());
     LOGG_ERROR_HANDLE(logger_set_level_details(LOG_LEVEL_DETAILS_ALL));
     LOGG_ERROR_HANDLE(logger_set_logout_file(logout_filename));
+
+    B_TREE_DUMB_ERROR_HANDLE(b_tree_dumb_ctor());
+    B_TREE_DUMB_ERROR_HANDLE(b_tree_dumb_set_out_file(dumb_filename));
     
     return EXIT_SUCCESS;
 }

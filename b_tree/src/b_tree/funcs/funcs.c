@@ -115,3 +115,84 @@ static enum BTreeError b_tree_node_dtor_(b_tree_node_t* node)
 }
 
 //===================================INSERT=========================================================
+
+static bool b_tree_node_is_full_(const b_tree_node_t* const node, size_t t);
+static bool b_tree_node_insert_to_leaf_ (b_tree_node_t* const node, size_t key_ind, int key);
+static enum BTreeError b_tree_insert_rec_(b_tree_node_t* node, b_tree_t* tree, int key);
+
+enum BTreeError b_tree_insert(b_tree_t* tree, int key)
+{
+    B_TREE_VERIFY_ASSERT(tree);
+
+    B_TREE_ERROR_HANDLE(b_tree_insert_rec_(tree->root, tree, key));
+
+    B_TREE_VERIFY_ASSERT(tree);
+
+    return B_TREE_ERROR_SUCCESS;
+}
+
+enum BTreeError b_tree_insert_rec_(b_tree_node_t* node, b_tree_t* tree, int key)
+{
+    B_TREE_VERIFY_ASSERT(tree);
+    lassert(!is_invalid_ptr(node), "");
+
+    if (!b_tree_node_is_full_(node, tree->t)) 
+    {
+        for (size_t key_ind = 0; key_ind < node->keys_cnt; ++key_ind)
+        {
+            if (node->keys[key_ind] > key)
+            {
+                if (!node->is_leaf)
+                {
+                    B_TREE_ERROR_HANDLE(b_tree_insert_rec_(node->children[key_ind], tree, key));
+                    break;
+                } 
+                else 
+                {
+                    B_TREE_ERROR_HANDLE(b_tree_node_insert_to_leaf_(node, key_ind, key));
+                    break;
+                }
+            }
+        }
+
+        if (!node->is_leaf)
+        {
+            B_TREE_ERROR_HANDLE(b_tree_insert_rec_(node->children[node->keys_cnt], tree, key));
+        } 
+        else 
+        {
+            B_TREE_ERROR_HANDLE(b_tree_node_insert_to_leaf_(node, node->keys_cnt, key));
+        }
+    }
+    else 
+    {
+        // TODO implement
+    }
+
+    B_TREE_VERIFY_ASSERT(tree);
+
+    return B_TREE_ERROR_SUCCESS;
+}
+
+static bool b_tree_node_is_full_(const b_tree_node_t* const node, size_t t)
+{
+    lassert(!is_invalid_ptr(node), "");
+    lassert(t > 0, "");
+
+    return node->keys_cnt >= 2 * t - 1;
+}
+
+static bool b_tree_node_insert_to_leaf_(b_tree_node_t* const node, size_t key_ind, int key)
+{
+    lassert(!is_invalid_ptr(node), "");
+    lassert(node->is_leaf, "");
+
+    for (size_t shift_ind = node->keys_cnt; shift_ind > key_ind; --shift_ind)
+    {
+        node->keys[shift_ind] = node->keys[shift_ind - 1];
+    }
+    node->keys[key_ind] = key;
+    ++node->keys_cnt;
+
+    return B_TREE_ERROR_SUCCESS;
+}

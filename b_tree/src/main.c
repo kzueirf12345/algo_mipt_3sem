@@ -21,6 +21,26 @@ int main(const int argc, char* const argv[])
         dtor_all(&flags_objs);
     );
 
+    // for (size_t i = tree.t * 2; i > 2; --i)
+    // {
+    //     B_TREE_INT_ERROR_HANDLE(
+    //         b_tree_insert(&tree, (int)i);
+    //         dtor_all(&flags_objs);
+    //     );
+    // }
+    
+    B_TREE_INT_ERROR_HANDLE(
+        b_tree_insert(&tree, (int)10);
+        dtor_all(&flags_objs);
+    );
+    B_TREE_INT_ERROR_HANDLE(
+        b_tree_insert(&tree, (int)4);
+        dtor_all(&flags_objs);
+    );
+
+
+    fprintf(stderr, "inserted num: %d\n", tree.root->keys[0]);
+
     B_TREE_INT_ERROR_HANDLE(
         b_tree_dtor(&tree);
         dtor_all(&flags_objs);

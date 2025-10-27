@@ -42,8 +42,7 @@ int main(const int argc, char* const argv[])
     // );
 
 
-
-    // fprintf(stderr, "inserted num: %d\n", tree.root->keys[0]);
+    fprintf(stderr, "inserted num: %d\n", tree.root->keys[0]);
 
     B_TREE_INT_ERROR_HANDLE(
         b_tree_dtor(&tree),

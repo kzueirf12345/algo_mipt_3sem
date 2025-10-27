@@ -3,6 +3,7 @@
 #include "b_tree/verification/verification.h"
 #include "utils/utils.h"
 #include "logger/src/logger.h"
+#include "utils/concole.h"
 
 //===================================CTOR DTOR======================================================
 
@@ -138,10 +139,12 @@ enum BTreeError b_tree_insert_rec_(b_tree_node_t* node, b_tree_t* tree, int key)
 
     if (!b_tree_node_is_full_(node, tree->t)) 
     {
+        bool is_inserted = false;
         for (size_t key_ind = 0; key_ind < node->keys_cnt; ++key_ind)
         {
             if (node->keys[key_ind] > key)
             {
+                is_inserted = true;
                 if (!node->is_leaf)
                 {
                     B_TREE_ERROR_HANDLE(b_tree_insert_rec_(node->children[key_ind], tree, key));
@@ -154,21 +157,25 @@ enum BTreeError b_tree_insert_rec_(b_tree_node_t* node, b_tree_t* tree, int key)
                 }
             }
         }
-
-        if (!node->is_leaf)
+        if (!is_inserted)
         {
-            B_TREE_ERROR_HANDLE(b_tree_insert_rec_(node->children[node->keys_cnt], tree, key));
-        } 
-        else 
-        {
-            B_TREE_ERROR_HANDLE(b_tree_node_insert_to_leaf_(node, node->keys_cnt, key));
+            if (!node->is_leaf)
+            {
+                B_TREE_ERROR_HANDLE(b_tree_insert_rec_(node->children[node->keys_cnt], tree, key));
+            } 
+            else 
+            {
+                B_TREE_ERROR_HANDLE(b_tree_node_insert_to_leaf_(node, node->keys_cnt, key));
+            }
         }
+        
     }
     else 
     {
+        fprintf(stderr, RED_TEXT("KAKA\n"));
         // TODO implement
     }
-
+    
     B_TREE_VERIFY_ASSERT(tree);
 
     return B_TREE_ERROR_SUCCESS;

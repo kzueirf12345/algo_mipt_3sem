@@ -3,6 +3,7 @@
 #include "b_tree/verification/verification.h"
 #include "utils/utils.h"
 #include "logger/src/logger.h"
+
 //===================================CTOR DTOR======================================================
 
 static enum BTreeError b_tree_node_ctor_(b_tree_node_t** node, size_t t, bool is_leaf);
@@ -234,4 +235,304 @@ static enum BTreeError b_tree_split_child_(b_tree_node_t* parent, size_t child_i
     parent->keys_cnt++;
 
     return B_TREE_ERROR_SUCCESS;
+}
+
+//===================================DELETE=========================================================
+
+static enum BTreeError b_tree_delete_from_node(b_tree_node_t* node, b_tree_t* tree, int key);
+static enum BTreeError b_tree_delete_from_leaf(b_tree_node_t* node, size_t key_ind);
+static enum BTreeError b_tree_delete_from_internal(b_tree_node_t* node, size_t key_ind, b_tree_t* tree);
+static enum BTreeError b_tree_merge_children(b_tree_node_t* parent, size_t child_ind, size_t t);
+static enum BTreeError b_tree_borrow_from_left(b_tree_node_t* parent, size_t child_ind);
+static enum BTreeError b_tree_borrow_from_right(b_tree_node_t* parent, size_t child_ind);
+static enum BTreeError b_tree_fill_child(b_tree_node_t* parent, size_t child_ind, size_t t);
+static int b_tree_get_predecessor(b_tree_node_t* node, size_t key_ind);
+static int b_tree_get_successor(b_tree_node_t* node, size_t key_ind);
+
+enum BTreeError b_tree_delete(b_tree_t* tree, int key)
+{
+    B_TREE_VERIFY_ASSERT(tree);
+    
+    if (!tree->root) {
+        return B_TREE_ERROR_SUCCESS; // Дерево пустое, ничего удалять
+    }
+    
+    B_TREE_ERROR_HANDLE(b_tree_delete_from_node(tree->root, tree, key));
+    
+    // Если корень стал пустым после удаления
+    if (tree->root->keys_cnt == 0) {
+        b_tree_node_t* old_root = tree->root;
+        
+        if (tree->root->is_leaf) {
+            tree->root = NULL;
+        } else {
+            tree->root = tree->root->children[0];
+        }
+        
+        B_TREE_ERROR_HANDLE(b_tree_node_dtor_(old_root));
+    }
+    
+    B_TREE_VERIFY_ASSERT(tree);
+    return B_TREE_ERROR_SUCCESS;
+}
+
+static enum BTreeError b_tree_delete_from_node(b_tree_node_t* node, b_tree_t* tree, int key)
+{
+    lassert(!is_invalid_ptr(node), "");
+    
+    size_t key_ind = 0;
+    while (key_ind < node->keys_cnt && node->keys[key_ind] < key) {
+        key_ind++;
+    }
+    
+    // Случай 1: ключ найден в этом узле
+    if (key_ind < node->keys_cnt && node->keys[key_ind] == key) {
+        if (node->is_leaf) {
+            return b_tree_delete_from_leaf(node, key_ind);
+        } else {
+            return b_tree_delete_from_internal(node, key_ind, tree);
+        }
+    }
+    // Случай 2: ключ не найден в этом узле
+    else {
+        if (node->is_leaf) {
+            return B_TREE_ERROR_SUCCESS; // Ключ не существует в дереве
+        }
+        
+        // Проверяем, находится ли ключ в последнем дочернем узле
+        bool is_last_child = (key_ind == node->keys_cnt);
+        
+        // Если дочерний узел имеет минимальное количество ключей, заполняем его
+        if (node->children[key_ind]->keys_cnt < tree->t) {
+            B_TREE_ERROR_HANDLE(b_tree_fill_child(node, key_ind, tree->t));
+        }
+        
+        // Если последний ребенок был слит с предыдущим, рекурсивно удаляем из предыдущего ребенка
+        if (is_last_child && key_ind > node->keys_cnt) {
+            return b_tree_delete_from_node(node->children[key_ind - 1], tree, key);
+        } else {
+            return b_tree_delete_from_node(node->children[key_ind], tree, key);
+        }
+    }
+}
+
+static enum BTreeError b_tree_delete_from_leaf(b_tree_node_t* node, size_t key_ind)
+{
+    lassert(!is_invalid_ptr(node), "");
+    lassert(node->is_leaf, "");
+    lassert(key_ind < node->keys_cnt, "");
+    
+    // Сдвигаем ключи влево
+    for (size_t i = key_ind; i < node->keys_cnt - 1; i++) {
+        node->keys[i] = node->keys[i + 1];
+    }
+    node->keys_cnt--;
+    
+    return B_TREE_ERROR_SUCCESS;
+}
+
+static enum BTreeError b_tree_delete_from_internal(b_tree_node_t* node, size_t key_ind, b_tree_t* tree)
+{
+    lassert(!is_invalid_ptr(node), "");
+    lassert(!node->is_leaf, "");
+    lassert(key_ind < node->keys_cnt, "");
+    
+    int key = node->keys[key_ind];
+    b_tree_node_t* left_child = node->children[key_ind];
+    b_tree_node_t* right_child = node->children[key_ind + 1];
+    
+    // Случай 2a: левый ребенок имеет хотя бы t ключей
+    if (left_child->keys_cnt >= tree->t) {
+        int predecessor = b_tree_get_predecessor(node, key_ind);
+        node->keys[key_ind] = predecessor;
+        return b_tree_delete_from_node(left_child, tree, predecessor);
+    }
+    // Случай 2b: правый ребенок имеет хотя бы t ключей
+    else if (right_child->keys_cnt >= tree->t) {
+        int successor = b_tree_get_successor(node, key_ind);
+        node->keys[key_ind] = successor;
+        return b_tree_delete_from_node(right_child, tree, successor);
+    }
+    // Случай 2c: оба ребенка имеют t-1 ключей - сливаем их
+    else {
+        B_TREE_ERROR_HANDLE(b_tree_merge_children(node, key_ind, tree->t));
+        // После слияния ключ переместился в left_child
+        return b_tree_delete_from_node(left_child, tree, key);
+    }
+}
+
+static enum BTreeError b_tree_fill_child(b_tree_node_t* parent, size_t child_ind, size_t t)
+{
+    lassert(!is_invalid_ptr(parent), "");
+    lassert(!parent->is_leaf, "");
+    lassert(child_ind < parent->keys_cnt + 1, "");
+    
+    b_tree_node_t* child = parent->children[child_ind];
+    
+    // Пытаемся взять ключ у левого брата
+    if (child_ind > 0 && parent->children[child_ind - 1]->keys_cnt >= t) {
+        B_TREE_ERROR_HANDLE(b_tree_borrow_from_left(parent, child_ind));
+    }
+    // Пытаемся взять ключ у правого брата
+    else if (child_ind < parent->keys_cnt && parent->children[child_ind + 1]->keys_cnt >= t) {
+        B_TREE_ERROR_HANDLE(b_tree_borrow_from_right(parent, child_ind));
+    }
+    // Сливаем с братом
+    else {
+        if (child_ind > 0) {
+            B_TREE_ERROR_HANDLE(b_tree_merge_children(parent, child_ind - 1, t));
+        } else {
+            B_TREE_ERROR_HANDLE(b_tree_merge_children(parent, child_ind, t));
+        }
+    }
+    
+    return B_TREE_ERROR_SUCCESS;
+}
+
+static enum BTreeError b_tree_merge_children(b_tree_node_t* parent, size_t child_ind, size_t t)
+{
+    lassert(!is_invalid_ptr(parent), "");
+    lassert(!parent->is_leaf, "");
+    lassert(child_ind < parent->keys_cnt, "");
+    
+    b_tree_node_t* left_child = parent->children[child_ind];
+    b_tree_node_t* right_child = parent->children[child_ind + 1];
+    
+    // Перемещаем ключ из родителя в левого ребенка
+    left_child->keys[left_child->keys_cnt] = parent->keys[child_ind];
+    left_child->keys_cnt++;
+    
+    // Копируем ключи из правого ребенка в левого
+    for (size_t i = 0; i < right_child->keys_cnt; i++) {
+        left_child->keys[left_child->keys_cnt + i] = right_child->keys[i];
+    }
+    
+    // Копируем детей из правого ребенка в левого (если они не листья)
+    if (!left_child->is_leaf) {
+        for (size_t i = 0; i <= right_child->keys_cnt; i++) {
+            left_child->children[left_child->keys_cnt + i] = right_child->children[i];
+        }
+    }
+    
+    left_child->keys_cnt += right_child->keys_cnt;
+    
+    // Сдвигаем ключи и детей в родителе
+    for (size_t i = child_ind; i < parent->keys_cnt - 1; i++) {
+        parent->keys[i] = parent->keys[i + 1];
+    }
+    
+    for (size_t i = child_ind + 1; i < parent->keys_cnt; i++) {
+        parent->children[i] = parent->children[i + 1];
+    }
+    
+    parent->keys_cnt--;
+    
+    // Освобождаем правого ребенка
+    B_TREE_ERROR_HANDLE(b_tree_node_dtor_(right_child));
+    
+    return B_TREE_ERROR_SUCCESS;
+}
+
+static enum BTreeError b_tree_borrow_from_left(b_tree_node_t* parent, size_t child_ind)
+{
+    lassert(!is_invalid_ptr(parent), "");
+    lassert(!parent->is_leaf, "");
+    lassert(child_ind > 0, "");
+    
+    b_tree_node_t* child = parent->children[child_ind];
+    b_tree_node_t* left_sibling = parent->children[child_ind - 1];
+    
+    // Сдвигаем ключи в ребенке вправо
+    for (size_t i = child->keys_cnt; i > 0; i--) {
+        child->keys[i] = child->keys[i - 1];
+    }
+    
+    // Сдвигаем детей в ребенке вправо (если не лист)
+    if (!child->is_leaf) {
+        for (size_t i = child->keys_cnt + 1; i > 0; i--) {
+            child->children[i] = child->children[i - 1];
+        }
+    }
+    
+    // Перемещаем ключ из родителя в ребенка
+    child->keys[0] = parent->keys[child_ind - 1];
+    child->keys_cnt++;
+    
+    // Перемещаем последнего ребенка из левого брата в ребенка
+    if (!child->is_leaf) {
+        child->children[0] = left_sibling->children[left_sibling->keys_cnt];
+    }
+    
+    // Перемещаем последний ключ из левого брата в родителя
+    parent->keys[child_ind - 1] = left_sibling->keys[left_sibling->keys_cnt - 1];
+    
+    left_sibling->keys_cnt--;
+    
+    return B_TREE_ERROR_SUCCESS;
+}
+
+static enum BTreeError b_tree_borrow_from_right(b_tree_node_t* parent, size_t child_ind)
+{
+    lassert(!is_invalid_ptr(parent), "");
+    lassert(!parent->is_leaf, "");
+    lassert(child_ind < parent->keys_cnt, "");
+    
+    b_tree_node_t* child = parent->children[child_ind];
+    b_tree_node_t* right_sibling = parent->children[child_ind + 1];
+    
+    // Перемещаем ключ из родителя в ребенка
+    child->keys[child->keys_cnt] = parent->keys[child_ind];
+    child->keys_cnt++;
+    
+    // Перемещаем первого ребенка из правого брата в ребенка
+    if (!child->is_leaf) {
+        child->children[child->keys_cnt] = right_sibling->children[0];
+    }
+    
+    // Перемещаем первый ключ из правого брата в родителя
+    parent->keys[child_ind] = right_sibling->keys[0];
+    
+    // Сдвигаем ключи в правом брате влево
+    for (size_t i = 0; i < right_sibling->keys_cnt - 1; i++) {
+        right_sibling->keys[i] = right_sibling->keys[i + 1];
+    }
+    
+    // Сдвигаем детей в правом брате влево
+    if (!right_sibling->is_leaf) {
+        for (size_t i = 0; i < right_sibling->keys_cnt; i++) {
+            right_sibling->children[i] = right_sibling->children[i + 1];
+        }
+    }
+    
+    right_sibling->keys_cnt--;
+    
+    return B_TREE_ERROR_SUCCESS;
+}
+
+static int b_tree_get_predecessor(b_tree_node_t* node, size_t key_ind)
+{
+    lassert(!is_invalid_ptr(node), "");
+    lassert(!node->is_leaf, "");
+    
+    // Идем к самому правому ребенку левого поддерева
+    b_tree_node_t* current = node->children[key_ind];
+    while (!current->is_leaf) {
+        current = current->children[current->keys_cnt];
+    }
+    
+    return current->keys[current->keys_cnt - 1];
+}
+
+static int b_tree_get_successor(b_tree_node_t* node, size_t key_ind)
+{
+    lassert(!is_invalid_ptr(node), "");
+    lassert(!node->is_leaf, "");
+    
+    // Идем к самому левому ребенку правого поддерева
+    b_tree_node_t* current = node->children[key_ind + 1];
+    while (!current->is_leaf) {
+        current = current->children[0];
+    }
+    
+    return current->keys[0];
 }

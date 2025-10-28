@@ -18,12 +18,19 @@ int main(const int argc, char* const argv[])
     
     b_tree_t tree = {};
     B_TREE_INT_ERROR_HANDLE(
-        b_tree_ctor(&tree, 2), 
+        b_tree_ctor(&tree, 4), 
         dtor_all(&flags_objs);
     );
 
     const int testKeys[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39};
     const size_t keyCount = sizeof(testKeys) / sizeof(testKeys[0]);
+
+    fprintf(stderr, "\n=== INSERT %d ===\n", 228666);
+
+    B_TREE_INT_ERROR_HANDLE(
+        b_tree_insert(&tree, 228666),
+        dtor_all(&flags_objs);
+    );
 
     for (size_t i = 0; i < keyCount; ++i)
     {
@@ -31,6 +38,38 @@ int main(const int argc, char* const argv[])
 
         B_TREE_INT_ERROR_HANDLE(
             b_tree_insert(&tree, testKeys[i]),
+            dtor_all(&flags_objs);
+        );
+
+        b_tree_dumb(&tree, NULL);
+
+        // fprintf(stderr, "\n=== DELETE %d ===\n", testKeys[i]);
+
+        // B_TREE_INT_ERROR_HANDLE(
+        //     b_tree_delete(&tree, testKeys[i]),
+        //     dtor_all(&flags_objs);
+        // );
+
+        // b_tree_dumb(&tree, NULL);
+
+        // fprintf(stderr, "\n=== INSERT %d ===\n", testKeys[i]);
+
+        // B_TREE_INT_ERROR_HANDLE(
+        //     b_tree_insert(&tree, testKeys[i]),
+        //     dtor_all(&flags_objs);
+        // );
+
+        // b_tree_dumb(&tree, NULL);
+
+    }
+
+    for (size_t i = 0; i < keyCount; ++i)
+    {
+        size_t ind = keyCount - i - 1;
+        fprintf(stderr, "\n=== DELETE %d ===\n", testKeys[ind]);
+
+        B_TREE_INT_ERROR_HANDLE(
+            b_tree_delete(&tree, testKeys[ind]),
             dtor_all(&flags_objs);
         );
 

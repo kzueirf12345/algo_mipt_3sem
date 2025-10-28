@@ -382,11 +382,9 @@ static int create_b_tree_dot_(const b_tree_t* const tree, const elem_to_str_t el
 
 static int create_b_tree_dot_recursive_(const b_tree_node_t* const node, const elem_to_str_t elem_to_str)
 {
-    if (!node)                          return  0;
     if (is_invalid_ptr(node))           return  0;
 
     const size_t my_id = b_node_count_++;
-
 
     fprintf(DUMBER_.dot_file, "node%zu [label = \"", my_id);
 
@@ -395,7 +393,7 @@ static int create_b_tree_dot_recursive_(const b_tree_node_t* const node, const e
     {
         if (elem_to_str)
         {
-            char keybuf[64] = {0};
+            char keybuf[FILENAME_MAX] = {0};
             int rc = elem_to_str(&node->keys[i], sizeof(node->keys[i]), keybuf, sizeof(keybuf));
             if (rc == 0)
                 fprintf(DUMBER_.dot_file, "%s", keybuf);

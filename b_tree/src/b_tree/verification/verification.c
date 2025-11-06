@@ -44,7 +44,7 @@ enum BTreeError b_tree_verify(const b_tree_t* const tree)
 
     if (tree->root == NULL) 
     {
-        return B_TREE_ERROR_ROOT_IS_NULL;
+        return B_TREE_ERROR_SUCCESS;
     }
 
     const enum BTreeError rec_veify_error = b_tree_verify_rec_(tree->root, tree);

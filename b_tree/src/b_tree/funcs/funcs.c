@@ -117,13 +117,20 @@ static enum BTreeError b_tree_node_dtor_(b_tree_node_t* node)
 //===================================INSERT=========================================================
 
 static bool b_tree_node_is_full_(const b_tree_node_t* const node, size_t t);
-static bool b_tree_node_insert_to_leaf_ (b_tree_node_t* const node, size_t key_ind, int key);
+static enum BTreeError b_tree_node_insert_to_leaf_ (b_tree_node_t* const node, size_t key_ind, int key);
 static enum BTreeError b_tree_insert_rec_(b_tree_node_t* node, b_tree_t* tree, int key);
 static enum BTreeError b_tree_split_child_(b_tree_node_t* parent, size_t child_ind, size_t t);
 
 enum BTreeError b_tree_insert(b_tree_t* tree, int key)
 {
     B_TREE_VERIFY_ASSERT(tree);
+
+    if (!tree->root) {
+        B_TREE_ERROR_HANDLE(b_tree_node_ctor_(&tree->root, tree->t, true));
+        tree->root->keys[0] = key;
+        tree->root->keys_cnt = 1;
+        return B_TREE_ERROR_SUCCESS;
+    }
 
     if (b_tree_node_is_full_(tree->root, tree->t))
     {
@@ -184,7 +191,7 @@ static bool b_tree_node_is_full_(const b_tree_node_t* const node, size_t t)
     return node->keys_cnt >= 2 * t - 1;
 }
 
-static bool b_tree_node_insert_to_leaf_(b_tree_node_t* const node, size_t key_ind, int key)
+static enum BTreeError b_tree_node_insert_to_leaf_(b_tree_node_t* const node, size_t key_ind, int key)
 {
     lassert(!is_invalid_ptr(node), "");
     lassert(node->is_leaf, "");
@@ -290,9 +297,7 @@ static enum BTreeError b_tree_delete_from_node(b_tree_node_t* node, b_tree_t* tr
         } else {
             return b_tree_delete_from_internal(node, key_ind, tree);
         }
-    }
-
-    else {
+    } else {
         if (node->is_leaf) {
             return B_TREE_ERROR_SUCCESS;
         }

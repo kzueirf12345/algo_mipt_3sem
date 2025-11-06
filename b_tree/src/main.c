@@ -27,10 +27,10 @@ int main(const int argc, char* const argv[])
 
     fprintf(stderr, "\n=== INSERT %d ===\n", 228666);
 
-    B_TREE_INT_ERROR_HANDLE(
-        b_tree_insert(&tree, 228666),
-        dtor_all(&flags_objs);
-    );
+    // B_TREE_INT_ERROR_HANDLE(
+    //     b_tree_insert(&tree, 228666),
+    //     dtor_all(&flags_objs);
+    // );
 
     for (size_t i = 0; i < keyCount; ++i)
     {
@@ -63,18 +63,18 @@ int main(const int argc, char* const argv[])
 
     }
 
-    // for (size_t i = 0; i < keyCount; ++i)
-    // {
-    //     size_t ind = keyCount - i - 1;
-    //     fprintf(stderr, "\n=== DELETE %d ===\n", testKeys[ind]);
+    for (size_t i = 0; i < keyCount; ++i)
+    {
+        size_t ind = i;
+        fprintf(stderr, "\n=== DELETE %d ===\n", testKeys[ind]);
 
-    //     B_TREE_INT_ERROR_HANDLE(
-    //         b_tree_delete(&tree, testKeys[ind]),
-    //         dtor_all(&flags_objs);
-    //     );
+        B_TREE_INT_ERROR_HANDLE(
+            b_tree_delete(&tree, testKeys[ind]),
+            dtor_all(&flags_objs);
+        );
 
-    //     b_tree_dumb(&tree, NULL);
-    // }
+        b_tree_dumb(&tree, NULL);
+    }
 
     // fprintf(stderr, "\nFinal tree structure dumped to dumb file.\n");
 

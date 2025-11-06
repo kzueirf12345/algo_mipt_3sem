@@ -78,7 +78,7 @@ static enum BTreeError b_tree_verify_rec_(const b_tree_node_t* const node, const
         }
     }
     
-    return B_TREE_ERROR_SUCCESS;
+    return B_TREE_ERROR_SUCCESS; // TODO balance check
 }
 
 static enum BTreeError b_tree_node_verify_(const b_tree_node_t* const node, const b_tree_t* const tree)

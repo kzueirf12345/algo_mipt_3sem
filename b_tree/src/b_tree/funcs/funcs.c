@@ -156,7 +156,7 @@ enum BTreeError b_tree_insert_rec_(b_tree_node_t* node, b_tree_t* tree, int key)
 
     if (node->is_leaf)
     {
-        size_t key_ind = 0;
+        size_t key_ind = 0; // TODO бежать с другой стороны и сразу двигать
         while (key_ind < node->keys_cnt && node->keys[key_ind] < key)
             key_ind++;
 

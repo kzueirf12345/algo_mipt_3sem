@@ -15,6 +15,8 @@ int main(const int argc, char* const argv[])
 {
     flags_objs_t flags_objs = {};
     MAIN_INT_ERROR_HANDLE(init_all(&flags_objs, argc, argv));
+
+    /* ====================================== */
     
     b_tree_t tree = {};
     B_TREE_INT_ERROR_HANDLE(
@@ -75,8 +77,6 @@ int main(const int argc, char* const argv[])
 
         b_tree_dumb(&tree, NULL);
     }
-
-    // fprintf(stderr, "\nFinal tree structure dumped to dumb file.\n");
 
     /* ====================================== */
 

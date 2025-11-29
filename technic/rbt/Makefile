@@ -33,7 +33,7 @@ SANITIZER = -fsanitize=address,alignment,bool,bounds,enum,float-cast-overflow,fl
 
 DEBUG_FLAGS = -D _DEBUG  -ggdb -Og -g3 -D_FORTIFY_SOURCES=3 $(SANITIZER)
 RELEASE_FLAGS = -DNDEBUG -O2
-
+ 
 ifneq ($(DEBUG_),0)
 FLAGS += $(DEBUG_FLAGS)
 else

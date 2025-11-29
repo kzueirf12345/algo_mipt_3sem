@@ -40,8 +40,39 @@ typedef struct RBTNode
 void rbt_insert(rbt_node_t** node_ptr, char* key, char* val);
 void rbt_erase(rbt_node_t** node_ptr, char* key);
 void rbt_find(rbt_node_t** node_ptr, char* key, char** res);
-
 void rbt_dtor(rbt_node_t** node_ptr);
+
+static rbt_node_t* NIL = NULL;
+
+static void ensure_nil()
+{
+    if (NIL) return;
+    NIL = calloc(1, sizeof(rbt_node_t));
+    if (!NIL) {
+        fprintf(stderr, "Can't allocate NIL node\n");
+        exit(EXIT_FAILURE);
+    }
+    NIL->color = NODE_COLOR_BLACK;
+    NIL->left = NIL->right = NIL->parent = NIL;
+    NIL->key[0] = '\0';
+    NIL->val[0] = '\0';
+}
+
+static rbt_node_t* new_node(const char* key, const char* val)
+{
+    ensure_nil();
+    rbt_node_t* n = calloc(1, sizeof(rbt_node_t));
+    if (!n) return NULL;
+    memcpy(n->key, key, INPUT_STR_SIZE_MAX - 1);
+    n->key[INPUT_STR_SIZE_MAX - 1] = '\0';
+    memcpy(n->val, val, INPUT_STR_SIZE_MAX - 1);
+    n->val[INPUT_STR_SIZE_MAX - 1] = '\0';
+    n->color = NODE_COLOR_RED;
+    n->left = NIL;
+    n->right = NIL;
+    n->parent = NIL;
+    return n;
+}
 
 int main() {
 
@@ -116,86 +147,81 @@ int main() {
     return EXIT_SUCCESS;
 }
 
-static inline void rbt_small_left_rotate(rbt_node_t* node)
+
+static inline void rbt_small_left_rotate(rbt_node_t* a)
 {
-    rbt_node_t* a = node;
-    if (!a) return;
+    if (!a || a == NIL) return;
     rbt_node_t* b = a->right;
-    if (!b) return;
+    if (!b || b == NIL) return;
 
     rbt_node_t* parent = a->parent;
-    
+
     a->right = b->left;
-    if (b->left) 
+    if (b->left != NIL)
     {
         b->left->parent = a;
     }
-    
+
     b->left = a;
     a->parent = b;
-    
+
     b->parent = parent;
-    
-    if (parent) {
-        if (parent->left == a) {
-            parent->left = b;
-        } else {
-            parent->right = b;
-        }
+
+    if (parent != NIL && parent != NULL) 
+    {
+        if (parent->left == a) parent->left = b;
+        else parent->right = b;
     }
 }
 
-static inline void rbt_small_right_rotate(rbt_node_t* node)
+static inline void rbt_small_right_rotate(rbt_node_t* a)
 {
-    rbt_node_t* a = node;
-    if (!a) return;
+    if (!a || a == NIL) return;
     rbt_node_t* b = a->left;
-    if (!b) return;
+    if (!b || b == NIL) return;
 
     rbt_node_t* parent = a->parent;
-    
+
     a->left = b->right;
-    if (b->right) 
+    if (b->right != NIL)
     {
         b->right->parent = a;
     }
-    
+
     b->right = a;
     a->parent = b;
-    
+
     b->parent = parent;
-    
-    if (parent) {
-        if (parent->left == a) {
-            parent->left = b;
-        } else {
-            parent->right = b;
-        }
+
+    if (parent != NIL && parent != NULL) 
+    {
+        if (parent->left == a) parent->left = b;
+        else parent->right = b;
     }
-    
 }
 
 static inline void rbt_fix_insertion(rbt_node_t* node)
 {
-    while (node->parent && node->parent->color == NODE_COLOR_RED) 
+    ensure_nil();
+    while (node->parent != NIL && node->parent->color == NODE_COLOR_RED)
     {
         rbt_node_t* parent = node->parent;
         rbt_node_t* grandparent = parent->parent;
-        
-        if (parent == grandparent->left) 
+
+        if (parent == grandparent->left)
         {
             rbt_node_t* uncle = grandparent->right;
-            
-            if (uncle && uncle->color == NODE_COLOR_RED)
+
+            if (uncle != NIL && uncle->color == NODE_COLOR_RED)
             {
                 parent->color = NODE_COLOR_BLACK;
                 grandparent->color = NODE_COLOR_RED;
                 uncle->color = NODE_COLOR_BLACK;
                 node = grandparent;
             }
-            else 
+            else
             {
-                if (node == parent->right) 
+                if (node == parent->right)
                 {
                     node = parent;
                     rbt_small_left_rotate(node);
@@ -207,20 +233,20 @@ static inline void rbt_fix_insertion(rbt_node_t* node)
                 rbt_small_right_rotate(grandparent);
             }
         }
-        else 
+        else
         {
             rbt_node_t* uncle = grandparent->left;
-            
-            if (uncle && uncle->color == NODE_COLOR_RED)
+
+            if (uncle != NIL && uncle->color == NODE_COLOR_RED)
             {
                 parent->color = NODE_COLOR_BLACK;
                 grandparent->color = NODE_COLOR_RED;
                 uncle->color = NODE_COLOR_BLACK;
                 node = grandparent;
             }
-            else 
+            else
             {
-                if (node == parent->left) 
+                if (node == parent->left)
                 {
                     node = parent;
                     rbt_small_right_rotate(node);
@@ -235,272 +261,314 @@ static inline void rbt_fix_insertion(rbt_node_t* node)
     }
 }
 
-void rbt_insert(rbt_node_t** node_ptr, char* key, char* val) 
+void rbt_insert(rbt_node_t** node_ptr, char* key, char* val)
 {
     assert(node_ptr);
     assert(key);
     assert(val);
 
-    rbt_node_t* node = *node_ptr;
+    ensure_nil();
 
-    rbt_node_t* insertion_node = calloc(1, sizeof(rbt_node_t));
-    insertion_node->color = NODE_COLOR_RED;
-    memcpy(insertion_node->key, key, INPUT_STR_SIZE_MAX - 1);
-    insertion_node->key[INPUT_STR_SIZE_MAX - 1] = '\0';
-    memcpy(insertion_node->val, val, INPUT_STR_SIZE_MAX - 1);
-    insertion_node->val[INPUT_STR_SIZE_MAX - 1] = '\0';
-
-    if (!node) {
-        insertion_node->color = NODE_COLOR_BLACK;
-        *node_ptr = insertion_node;
+    rbt_node_t* root = *node_ptr;
+    if (!root)
+    {
+        rbt_node_t* node = new_node(key, val);
+        if (!node) 
+        {
+            fprintf(stderr, "Can't allocate node\n");
+            return;
+        }
+        node->color = NODE_COLOR_BLACK;
+        node->parent = NIL;
+        node->left = NIL;
+        node->right = NIL;
+        *node_ptr = node;
         return;
     }
 
-    rbt_node_t* cur = NULL;
+    rbt_node_t* cur = root;
 
-    int cmp = 0;
-
-    while (node) 
+    while (cur != NIL)
     {
-        cur = node;
-        cmp = strncmp(key, node->key, INPUT_STR_SIZE_MAX - 1);
-
-        if (cmp > 0)
+        int cmp = strncmp(key, cur->key, INPUT_STR_SIZE_MAX - 1);
+        if (cmp == 0)
         {
-            node = node->right;            
+            memcpy(cur->val, val, INPUT_STR_SIZE_MAX - 1);
+            cur->val[INPUT_STR_SIZE_MAX - 1] = '\0';
+            return;
         }
         else if (cmp < 0)
         {
-            node = node->left;
+            if (cur->left == NIL) break;
+            cur = cur->left;
         }
-        else 
+        else
         {
-            memcpy(node->val, val, INPUT_STR_SIZE_MAX - 1);
-            node->val[INPUT_STR_SIZE_MAX - 1] = '\0';
-            free(insertion_node);
-            return;
+            if (cur->right == NIL) break;
+            cur = cur->right;
         }
     }
-    
-    insertion_node->parent = cur;
 
-    if (cmp > 0)
+    rbt_node_t* insertion_node = new_node(key, val);
+    if (!insertion_node) 
     {
-        cur->right = insertion_node;       
+        fprintf(stderr, "Can't allocate node\n");
+        return;
     }
-    else if (cmp < 0)
+
+    insertion_node->parent = cur;
+    if (cur == NIL) 
     {
-        cur->left = insertion_node;   
+        *node_ptr = insertion_node;
+        insertion_node->color = NODE_COLOR_BLACK;
+        insertion_node->parent = NIL;
+        return;
+    } 
+    else 
+    {
+        int cmp = strncmp(insertion_node->key, cur->key, INPUT_STR_SIZE_MAX - 1);
+        if (cmp < 0) cur->left = insertion_node;
+        else cur->right = insertion_node;
     }
 
     rbt_fix_insertion(insertion_node);
 
-    rbt_node_t* root = insertion_node;
-    while (root->parent) 
-    {
-        root = root->parent;
-    }
-    *node_ptr = root;
+    rbt_node_t* top = insertion_node;
+    while (top->parent != NIL) top = top->parent;
+    *node_ptr = top;
     (*node_ptr)->color = NODE_COLOR_BLACK;
-
-    return;
-}
-
-static void rbt_fix_erase(rbt_node_t* node)
-{
-    while (node->parent && node->color == NODE_COLOR_BLACK)
-    {
-        if (node == node->parent->left)
-        {
-            rbt_node_t* s = node->parent->right;
-
-            if (s->color == NODE_COLOR_RED)
-            {
-                s->color = NODE_COLOR_BLACK;
-                node->parent->color = NODE_COLOR_RED;
-                rbt_small_left_rotate(node->parent);
-                s = node->parent->right;
-            }
-
-            if ((!s->left  || s->left->color  == NODE_COLOR_BLACK) &&
-                (!s->right || s->right->color == NODE_COLOR_BLACK))
-            {
-                s->color = NODE_COLOR_RED;
-                node = node->parent;
-            }
-            else
-            {
-                if (!s->right || s->right->color == NODE_COLOR_BLACK)
-                {
-                    if (s->left) s->left->color = NODE_COLOR_BLACK;
-                    s->color = NODE_COLOR_RED;
-                    rbt_small_right_rotate(s);
-                    s = node->parent->right;
-                }
-
-                s->color = node->parent->color;
-                node->parent->color = NODE_COLOR_BLACK;
-                if (s->right) s->right->color = NODE_COLOR_BLACK;
-                rbt_small_left_rotate(node->parent);
-                break;
-            }
-        }
-        else
-        {
-            rbt_node_t* s = node->parent->left;
-
-            if (s->color == NODE_COLOR_RED)
-            {
-                s->color = NODE_COLOR_BLACK;
-                node->parent->color = NODE_COLOR_RED;
-                rbt_small_right_rotate(node->parent);
-                s = node->parent->left;
-            }
-
-            if ((!s->left  || s->left->color  == NODE_COLOR_BLACK) &&
-                (!s->right || s->right->color == NODE_COLOR_BLACK))
-            {
-                s->color = NODE_COLOR_RED;
-                node = node->parent;
-            }
-            else
-            {
-                if (!s->left || s->left->color == NODE_COLOR_BLACK)
-                {
-                    if (s->right) s->right->color = NODE_COLOR_BLACK;
-                    s->color = NODE_COLOR_RED;
-                    rbt_small_left_rotate(s);
-                    s = node->parent->left;
-                }
-
-                s->color = node->parent->color;
-                node->parent->color = NODE_COLOR_BLACK;
-                if (s->left) s->left->color = NODE_COLOR_BLACK;
-                rbt_small_right_rotate(node->parent);
-                break;
-            }
-        }
-    }
-
-    node->color = NODE_COLOR_BLACK;
 }
 
 static rbt_node_t* rbt_min(rbt_node_t* node)
 {
-    while (node->left) node = node->left;
+    ensure_nil();
+    while (node->left != NIL) node = node->left;
     return node;
+}
+
+static void rbt_fix_erase(rbt_node_t* x)
+{
+    ensure_nil();
+    while (x != NIL && x->parent != NIL && x->color == NODE_COLOR_BLACK)
+    {
+        if (x == x->parent->left)
+        {
+            rbt_node_t* w = x->parent->right;
+            
+            if (w->color == NODE_COLOR_RED)
+            {
+                w->color = NODE_COLOR_BLACK;
+                x->parent->color = NODE_COLOR_RED;
+                rbt_small_left_rotate(x->parent);
+                w = x->parent->right;
+            }
+
+            if (w->left->color == NODE_COLOR_BLACK && w->right->color == NODE_COLOR_BLACK)
+            {
+                w->color = NODE_COLOR_RED;
+                x = x->parent;
+            }
+            else
+            {
+                if (w->right->color == NODE_COLOR_BLACK)
+                {
+                    w->left->color = NODE_COLOR_BLACK;
+                    w->color = NODE_COLOR_RED;
+                    rbt_small_right_rotate(w);
+                    w = x->parent->right;
+                }
+                w->color = x->parent->color;
+                x->parent->color = NODE_COLOR_BLACK;
+                w->right->color = NODE_COLOR_BLACK;
+                rbt_small_left_rotate(x->parent);
+                x = NIL;
+            }
+        }
+        else
+        {
+            rbt_node_t* w = x->parent->left;
+
+            if (w->color == NODE_COLOR_RED)
+            {
+                w->color = NODE_COLOR_BLACK;
+                x->parent->color = NODE_COLOR_RED;
+                rbt_small_right_rotate(x->parent);
+                w = x->parent->left;
+            }
+
+            if (w->right->color == NODE_COLOR_BLACK && w->left->color == NODE_COLOR_BLACK)
+            {
+                w->color = NODE_COLOR_RED;
+                x = x->parent;
+            }
+            else
+            {
+                if (w->left->color == NODE_COLOR_BLACK)
+                {
+                    w->right->color = NODE_COLOR_BLACK;
+                    w->color = NODE_COLOR_RED;
+                    rbt_small_left_rotate(w);
+                    w = x->parent->left;
+                }
+                w->color = x->parent->color;
+                x->parent->color = NODE_COLOR_BLACK;
+                w->left->color = NODE_COLOR_BLACK;
+                rbt_small_right_rotate(x->parent);
+                x = NIL;
+            }
+        }
+    }
+
+    if (x != NIL) x->color = NODE_COLOR_BLACK;
 }
 
 void rbt_erase(rbt_node_t** node_ptr, char* key)
 {
+    assert(node_ptr);
+    assert(key);
+
+    ensure_nil();
+
     rbt_node_t* root = *node_ptr;
-    rbt_node_t* node = root;
+    if (!root) return;
 
-    int cmp = -1;
-
-    while (node)
+    rbt_node_t* z = root;
+    while (z != NIL)
     {
-        cmp = strncmp(key, node->key, INPUT_STR_SIZE_MAX - 1);
-
-        if      (cmp > 0) node = node->right;
-        else if (cmp < 0) node = node->left;
-        else break;
+        int cmp = strncmp(key, z->key, INPUT_STR_SIZE_MAX - 1);
+        if (cmp == 0) break;
+        else if (cmp < 0) z = z->left;
+        else z = z->right;
     }
 
-    if (!node) return;
+    if (z == NIL) return;
 
-    rbt_node_t* y = node;
-    rbt_node_t* x;
-    enum NodeColor yOriginalColor = y->color;
+    rbt_node_t* y = z;
+    enum NodeColor y_original_color = y->color;
+    rbt_node_t* x = NIL;
 
-    if (!node->left)
+    if (z->left == NIL)
     {
-        x = node->right;
-        if (x) 
+        x = z->right;
+        if (z->parent == NIL) 
         {
-            x->parent = node->parent;
+            *node_ptr = x == NIL ? NULL : x;
+        } 
+        else if 
+        (z == z->parent->left) 
+        {
+            z->parent->left = z->right;
+        } 
+        else 
+        {
+            z->parent->right = z->right;
         }
 
-        if (!node->parent)                      *node_ptr           = x;
-        else if (node == node->parent->left)    node->parent->left  = x;
-        else                                    node->parent->right = x;
+        if (z->right != NIL) z->right->parent = z->parent;
     }
-    else if (!node->right)
+    else if (z->right == NIL)
     {
-        x = node->left;
-        if (x) 
+        x = z->left;
+        if (z->parent == NIL) 
         {
-            x->parent = node->parent;
+            *node_ptr = x == NIL ? NULL : x;
+        } 
+        else if (z == z->parent->left) 
+        {
+            z->parent->left = z->left;
+        } 
+        else 
+        {
+            z->parent->right = z->left;
         }
 
-        if (!node->parent)                      *node_ptr           = x;
-        else if (node == node->parent->left)    node->parent->left  = x;
-        else                                    node->parent->right = x;
+        if (z->left != NIL) z->left->parent = z->parent;
     }
     else
     {
-        y = rbt_min(node->right);
-        yOriginalColor = y->color;
+        y = rbt_min(z->right);
+        y_original_color = y->color;
         x = y->right;
 
-        if (x) x->parent = y;
-
-        if (y->parent != node)
+        if (y->parent == z)
         {
-            if (y->parent->left == y)   y->parent->left  = x;
-            else                        y->parent->right = x;
+            x->parent = y;
+        }
+        else
+        {
+            if (y->parent->left == y) y->parent->left = y->right;
+            else                      y->parent->right = y->right;
 
-            y->right = node->right;
+            if (y->right != NIL) y->right->parent = y->parent;
 
-            if (y->right) 
-            {
-                y->right->parent = y;
-            }
+            y->right = z->right;
+
+            if (y->right != NIL) y->right->parent = y;
         }
 
-        if (!node->parent)                      *node_ptr = y;
-        else if (node->parent->left == node)    node->parent->left = y;
-        else                                    node->parent->right = y;
-
-        y->parent = node->parent;
-        y->left = node->left;
-        if (y->left) 
+        if (z->parent == NIL) 
         {
-            y->left->parent = y;
+            *node_ptr = y;
+        } 
+        else if (z == z->parent->left) 
+        {
+            z->parent->left = y;
+        } 
+        else 
+        {
+            z->parent->right = y;
         }
-        y->color = node->color;
+        y->parent = z->parent;
+
+        y->left = z->left;
+
+        if (y->left != NIL) y->left->parent = y;
+
+        y->color = z->color;
     }
 
-    free(node);
+    free(z);
 
-    if (yOriginalColor == NODE_COLOR_BLACK)
+    if (y_original_color == NODE_COLOR_BLACK) 
     {
-        if      (x)         rbt_fix_erase(x);
-        else if (*node_ptr) rbt_fix_erase(*node_ptr);
+        rbt_fix_erase(x);
+    }
+
+    if (*node_ptr != NULL) 
+    {
+        while ((*node_ptr)->parent != NIL) 
+        {
+            *node_ptr = (*node_ptr)->parent;
+        }
+    }
+    
+    if (*node_ptr == NIL) 
+    {
+        *node_ptr = NULL;
     }
 }
 
-
-void rbt_find(rbt_node_t** node_ptr, char* key, char** res) 
+void rbt_find(rbt_node_t** node_ptr, char* key, char** res)
 {
     assert(node_ptr);
     assert(key);
     assert(res);
 
-    rbt_node_t* cur = *node_ptr;
+    ensure_nil();
 
-    while (cur)
+    rbt_node_t* cur = *node_ptr;
+    if (!cur) 
+    {
+        *res = NULL;
+        return;
+    }
+
+    while (cur != NIL)
     {
         int cmp = strncmp(key, cur->key, INPUT_STR_SIZE_MAX - 1);
-        if (cmp > 0)
-        {
-            cur = cur->right;
-        }
-        else if (cmp < 0)
-        {
-            cur = cur->left;
-        }
-        else
+        if (cmp > 0) cur = cur->right;
+        else if (cmp < 0) cur = cur->left;
+        else 
         {
             *res = cur->val;
             return;
@@ -510,24 +578,28 @@ void rbt_find(rbt_node_t** node_ptr, char* key, char** res)
     *res = NULL;
 }
 
+static void rbt_free_nodes_recursive(rbt_node_t* node)
+{
+    if (!node || node == NIL) return;
+    rbt_free_nodes_recursive(node->left);
+    rbt_free_nodes_recursive(node->right);
+    free(node);
+}
 
-void rbt_dtor(rbt_node_t** node_ptr) 
+void rbt_dtor(rbt_node_t** node_ptr)
 {
     assert(node_ptr);
+    ensure_nil();
 
-    rbt_node_t* const node = *node_ptr;
-
-    if (!node) 
-    {
-        return;
+    rbt_node_t* root = *node_ptr;
+    if (root && root != NIL) {
+        rbt_free_nodes_recursive(root);
     }
 
-    rbt_dtor(&node->left);
-    rbt_dtor(&node->right);
+    if (NIL) {
+        free(NIL);
+        NIL = NULL;
+    }
 
-    free(node);
-    
     *node_ptr = NULL;
-    
-    return;
 }

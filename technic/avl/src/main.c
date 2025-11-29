@@ -242,7 +242,7 @@ static inline avl_node_t* avl_remove_min(avl_node_t** node_ptr)
     {
         *node_ptr = n->right;
         return n;
-    }
+    } 
 
     avl_node_t* res = avl_remove_min(&n->left);
     avl_balance(node_ptr);

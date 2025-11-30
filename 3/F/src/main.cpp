@@ -1,46 +1,68 @@
-#include <cstddef>
-#include <iostream>
-#include <vector>
-#include <unordered_map>
-#include <cstdint>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
 
-// FIXME not work in last test
+int compare(const void *a, const void *b);
+
+int compare(const void *a, const void *b) {
+    int32_t x = *(const int32_t*)a;
+    int32_t y = *(const int32_t*)b;
+    return (x > y) - (x < y);
+}
 
 int main() {
-    size_t N, M;
-    std::cin >> N >> M;
-    std::unordered_map<int32_t, std::vector<size_t>> elementSets;
-
-    for (size_t i = 0; i < N; ++i) {
-        for (size_t j = 0; j < M; ++j) {
-            int32_t elem;
-            std::cin >> elem;
-            elementSets[elem].push_back(i);
-        }
+    uint32_t N, M;
+    if (scanf("%u %u", &N, &M) != 2) {
+        return EXIT_FAILURE;
     }
-
-    std::unordered_map<uint64_t, size_t> intersectionCount;
-    size_t maxIntersection = 0;
-
-    for (const auto& [elem, indices] : elementSets) {
-        for (size_t i = 0; i < indices.size(); ++i) {
-            for (size_t j = i + 1; j < indices.size(); ++j) {
-                size_t a = indices[i], b = indices[j];
-                if (a > b) {
-                    std::swap(a, b);
+    
+    int32_t **sets = (int32_t**)calloc(N, sizeof(int32_t*));
+    
+    for (uint32_t i = 0; i < N; ++i) {
+        sets[i] = (int32_t*)calloc(M, sizeof(int32_t));
+        
+        for (uint32_t j = 0; j < M; ++j) {
+            if (scanf("%d", &sets[i][j]) != 1) {
+                return EXIT_FAILURE;
+            }
+        }
+        
+        qsort(sets[i], M, sizeof(int32_t), compare);
+    }
+    
+    uint16_t maxIntersection = 0;
+    
+    for (uint32_t i = 0; i < N; ++i) {
+        for (uint32_t j = i + 1; j < N; ++j) {
+            uint16_t count = 0;
+            uint32_t idx1 = 0, idx2 = 0;
+            int32_t *arr1 = sets[i];
+            int32_t *arr2 = sets[j];
+            
+            while (idx1 < M && idx2 < M) {
+                if (arr1[idx1] == arr2[idx2]) {
+                    ++count;
+                    ++idx1;
+                    ++idx2;
+                } else if (arr1[idx1] < arr2[idx2]) {
+                    ++idx1;
+                } else {
+                    ++idx2;
                 }
-                uint64_t key = ((uint64_t)a << 32) | b;
-                size_t cnt = ++intersectionCount[key];
-
-                if (cnt > maxIntersection) {
-                    maxIntersection = cnt;
-                }
+            }
+            
+            if (count > maxIntersection) {
+                maxIntersection = count;
             }
         }
     }
-
-    std::cout << maxIntersection << std::endl;
+    
+    printf("%u\n", maxIntersection);
+    
+    for (uint32_t i = 0; i < N; ++i) {
+        free(sets[i]);
+    }
+    free(sets);
+    
     return 0;
-
-
 }

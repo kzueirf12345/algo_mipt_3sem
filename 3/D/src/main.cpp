@@ -1,37 +1,25 @@
 #include <iostream>
-// #include <unordered_set>
-#include <set>
-// #include <unordered_map>
-#include <map>
+#include <unordered_set>
+#include <unordered_map>
 #include <vector>
 #include <algorithm>
-
-
-// FIXME not work
 
 struct Coord {
     int x;
     int y;
 };
 
-// struct HashCoord {
-//     size_t operator()(const Coord& c) const {
-//         return std::hash<int>()(c.x) ^ (std::hash<int>()(c.y) << 1);
-//     }
-// };
+struct HashCoord {
+    size_t operator()(const Coord& c) const {
+        return std::hash<int>()(c.x) ^ (std::hash<int>()(c.y) << 1);
+    }
+};
 
 bool operator==(const Coord& a, const Coord& b);
 
 bool operator==(const Coord& a, const Coord& b) {
     return a.x == b.x && a.y == b.y;
 }
-
-bool operator<(const Coord& a, const Coord& b);
-
-bool operator<(const Coord& a, const Coord& b) {
-    return a.x == b.x ? a.y < b.y : a.x < b.x;
-}
-
 
 int main() {
     std::ios::sync_with_stdio(false);
@@ -40,7 +28,7 @@ int main() {
     size_t n = 0, m = 0, l = 0, k = 0;
     std::cin >> n >> m >> l >> k;
 
-    std::set<Coord> alive;
+    std::unordered_set<Coord, HashCoord> alive;
     for (size_t i = 0; i < l; ++i) {
         Coord c;
         std::cin >> c.x >> c.y;
@@ -52,7 +40,7 @@ int main() {
     };
 
     for (size_t step = 0; step < k; ++step) {
-        std::map<Coord, size_t> neighborCount;
+        std::unordered_map<Coord, size_t, HashCoord> neighborCount;
         for (auto& c : alive) {
             for (auto& d : dirs) {
                 int nx = c.x + d.first;
@@ -64,7 +52,7 @@ int main() {
             }
         }
 
-        std::set<Coord> nextAlive;
+        std::unordered_set<Coord, HashCoord> nextAlive;
         for (auto& [c, cnt] : neighborCount) {
             if (alive.find(c) != alive.end()) {
                 if (cnt == 2 || cnt == 3) nextAlive.insert(c);
@@ -76,14 +64,14 @@ int main() {
         alive = std::move(nextAlive);
     }
 
-    // std::vector<Coord> result(alive.begin(), alive.end());
-    // std::sort(result.begin(), result.end(), 
-    //     [](const Coord& a, const Coord& b){
-    //         return a.x != b.x ? a.x < b.x : a.y < b.y;
-    //     }
-    // );
+    std::vector<Coord> result(alive.begin(), alive.end());
+    std::sort(result.begin(), result.end(), 
+        [](const Coord& a, const Coord& b){
+            return a.x != b.x ? a.x < b.x : a.y < b.y;
+        }
+    );
 
-    for (auto& c : alive) {
+    for (auto& c : result) {
         std::cout << c.x << " " << c.y << std::endl;
     }
 

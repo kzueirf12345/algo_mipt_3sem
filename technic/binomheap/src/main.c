@@ -57,23 +57,28 @@ typedef struct heapInfo {
     heap_t** heap;
 } heap_info_t;
 
-heap_info_t heap_infos[1000005] = {};
+typedef struct Heaps {
+    heap_t** roots;
+    heap_info_t* nodes_info;
+    size_t roots_cnt;
+    size_t max_nodes_cnt;
+} heaps_t;
 
 
-int heaps_ctor(heap_t*** heaps, size_t size);
-int heaps_dtor(heap_t*** heaps, size_t size);
+int heaps_ctor(heaps_t* heaps, size_t size, size_t max_nodes_cnt);
+int heaps_dtor(heaps_t* heaps);
 
 int heap_ctor(heap_t** node, int64_t key, size_t ind, heap_t* parent, heap_t* child, heap_t* sibling, size_t degree);
 int heap_dtor(heap_t* heap);
 
-size_t heap_find_node(heap_t** heaps, size_t heaps_size, size_t ind, heap_t** found_node);
+size_t heap_find_node(heaps_t* heaps, size_t heaps_size, size_t ind, heap_t** found_node);
 
-int heap_insert(heap_t** heap, int64_t val, size_t ind);
-int heap_trans(heap_t** src, heap_t** dst);
-int heap_erase(size_t ind);
-int heap_update(size_t ind, int64_t val);
-int heap_get_min(heap_t* heap, int64_t* min);
-int heap_erase_min(heap_t** heap);
+int heap_insert(heaps_t* heaps, heap_t** heap, int64_t val, size_t ind);
+int heap_trans(heaps_t* heaps, heap_t** src, heap_t** dst);
+int heap_erase(heaps_t* heaps, size_t ind);
+int heap_update(heaps_t* heaps, size_t ind, int64_t val);
+int heap_get_min(heaps_t* heaps, heap_t* heap, int64_t* min); 
+int heap_erase_min(heaps_t* heaps, heap_t** heap);
 
 int main() 
 {
@@ -84,15 +89,15 @@ int main()
         return EXIT_FAILURE;
     }
 
-    heap_t** heaps = NULL;
-    ERROR_HANDLE(heaps_ctor(&heaps, heaps_size));
-
     size_t commands_cnt = 0;
     
     if (scanf("%lu", &commands_cnt) != 1) {
         fprintf(stderr, "Can't scanf commands_cnt\n");
         return EXIT_FAILURE;
     }
+
+    heaps_t heaps = {};
+    ERROR_HANDLE(heaps_ctor(&heaps, heaps_size, commands_cnt + 1));
 
     enum Command command_type = 0;
 
@@ -104,7 +109,7 @@ int main()
             if (feof(stdin) && !ferror(stdin)) {
                 break;
             }
-            heaps_dtor(&heaps, heaps_size);
+            heaps_dtor(&heaps);
             fprintf(stderr, "Can't scanf command type\n");
             return EXIT_FAILURE;
         }
@@ -115,15 +120,15 @@ int main()
                 int64_t val = 0;
 
                 if (scanf("%lu %ld", &heap_num, &val) != 2) {
-                    heaps_dtor(&heaps, heaps_size);
+                    heaps_dtor(&heaps);
                     fprintf(stderr, "Can't scanf heap insert input\n");
                     return EXIT_FAILURE;
                 }
                 --heap_num;
 
                 ERROR_HANDLE(
-                    heap_insert(&heaps[heap_num], val, global_ind), 
-                    heaps_dtor(&heaps, heaps_size);
+                    heap_insert(&heaps, &(heaps.roots[heap_num]), val, global_ind), 
+                    heaps_dtor(&heaps);
                 );
                 ++global_ind;
                 break;
@@ -134,7 +139,7 @@ int main()
                 size_t dst_num = 0;
 
                 if (scanf("%lu %lu", &src_num, &dst_num) != 2) {
-                    heaps_dtor(&heaps, heaps_size);
+                    heaps_dtor(&heaps);
                     fprintf(stderr, "Can't scanf heap trans input\n");
                     return EXIT_FAILURE;
                 }
@@ -142,8 +147,8 @@ int main()
                 --dst_num;
 
                 ERROR_HANDLE(
-                    heap_trans(&heaps[src_num], &heaps[dst_num]), 
-                    heaps_dtor(&heaps, heaps_size);
+                    heap_trans(&heaps, &heaps.roots[src_num], &heaps.roots[dst_num]), 
+                    heaps_dtor(&heaps);
                 );
                 break;
             }
@@ -152,14 +157,14 @@ int main()
                 size_t ind = 0;
 
                 if (scanf("%lu", &ind) != 1) {
-                    heaps_dtor(&heaps, heaps_size);
+                    heaps_dtor(&heaps);
                     fprintf(stderr, "Can't scanf heap erase input\n");
                     return EXIT_FAILURE;
                 }
 
                 ERROR_HANDLE(
-                    heap_erase(ind), 
-                    heaps_dtor(&heaps, heaps_size);
+                    heap_erase(&heaps, ind), 
+                    heaps_dtor(&heaps);
                 );
                 break;
             }
@@ -169,14 +174,14 @@ int main()
                 int64_t val = 0;
 
                 if (scanf("%lu %ld", &ind, &val) != 2) {
-                    heaps_dtor(&heaps, heaps_size);
+                    heaps_dtor(&heaps);
                     fprintf(stderr, "Can't scanf heap update input\n");
                     return EXIT_FAILURE;
                 }
 
                 ERROR_HANDLE(
-                    heap_update(ind, val), 
-                    heaps_dtor(&heaps, heaps_size);
+                    heap_update(&heaps, ind, val), 
+                    heaps_dtor(&heaps);
                 );
                 break;
             }
@@ -185,7 +190,7 @@ int main()
                 size_t heap_num = 0;
 
                 if (scanf("%lu", &heap_num) != 1) {
-                    heaps_dtor(&heaps, heaps_size);
+                    heaps_dtor(&heaps);
                     fprintf(stderr, "Can't scanf heap print min input\n");
                     return EXIT_FAILURE;
                 }
@@ -194,8 +199,8 @@ int main()
                 int64_t min = 0;
 
                 ERROR_HANDLE(
-                    heap_get_min(heaps[heap_num], &min), 
-                    heaps_dtor(&heaps, heaps_size);
+                    heap_get_min(&heaps, heaps.roots[heap_num], &min), 
+                    heaps_dtor(&heaps);
                 );
 
                 printf("%ld\n", min);
@@ -206,27 +211,27 @@ int main()
                 size_t heap_num = 0;
 
                 if (scanf("%lu", &heap_num) != 1) {
-                    heaps_dtor(&heaps, heaps_size);
+                    heaps_dtor(&heaps);
                     fprintf(stderr, "Can't scanf heap erase min input\n");
                     return EXIT_FAILURE;
                 }
                 --heap_num;
 
                 ERROR_HANDLE(
-                    heap_erase_min(&heaps[heap_num]), 
-                    heaps_dtor(&heaps, heaps_size);
+                    heap_erase_min(&heaps, &heaps.roots[heap_num]), 
+                    heaps_dtor(&heaps);
                 );
                 break;
             }
 
             default:
                 fprintf(stderr, "Unknown command type\n");
-                heaps_dtor(&heaps, heaps_size);
+                heaps_dtor(&heaps);
                 return EXIT_FAILURE;
         }
     }
 
-    ERROR_HANDLE(heaps_dtor(&heaps, heaps_size));
+    ERROR_HANDLE(heaps_dtor(&heaps));
 
     return EXIT_SUCCESS;
 }
@@ -241,36 +246,40 @@ static void heap_dtor_recursive(heap_t* heap)
     heap_dtor(heap);
 }
 
-static void update_heap(heap_t* root, heap_t** heap)
+static void update_heap(heaps_t* heaps, heap_t* root, heap_t** heap)
 {
     if (!root) return;
 
-    heap_infos[root->ind].heap = heap;
+    heaps->nodes_info[root->ind].heap = heap;
 
-    update_heap(root->child, heap);
-    update_heap(root->sibling, heap);
+    update_heap(heaps, root->child, heap);
+    update_heap(heaps, root->sibling, heap);
 }
 
 
-int heaps_ctor(heap_t*** heaps, size_t size) 
+int heaps_ctor(heaps_t* heaps, size_t size, size_t max_nodes_cnt) 
 {
     assert(heaps);
     assert(size);
 
-    *heaps = calloc(size, sizeof(**heaps));
+    heaps->roots_cnt = size;
+    heaps->max_nodes_cnt = max_nodes_cnt;
+    heaps->roots = calloc(size, sizeof(*heaps->roots));
+    heaps->nodes_info = calloc(max_nodes_cnt, sizeof(*heaps->nodes_info));
 
     return EXIT_SUCCESS;
 }
 
-int heaps_dtor(heap_t*** heaps, size_t size) 
+int heaps_dtor(heaps_t* heaps) 
 {
     assert(heaps);
 
-    for (size_t ind = 0; ind < size; ++ind) {
-        heap_dtor_recursive((*heaps)[ind]);
+    for (size_t ind = 0; ind < heaps->roots_cnt; ++ind) {
+        heap_dtor_recursive(heaps->roots[ind]);
     }
 
-    free(*heaps); *heaps = NULL;
+    free(heaps->roots); heaps->roots = NULL;
+    free(heaps->nodes_info); heaps->nodes_info = NULL;
 
     return EXIT_SUCCESS;
 }
@@ -297,30 +306,35 @@ int heap_dtor(heap_t* node)
     return EXIT_SUCCESS;
 }
 
-int heap_insert(heap_t** heap, int64_t val, size_t ind) 
+int heap_insert(heaps_t* heaps, heap_t** heap, int64_t val, size_t ind) 
 {
+    if (!heap) {
+        return EXIT_FAILURE;
+    }
     assert(heap);
+    assert(heaps);
 
     heap_t* node = NULL;
     ERROR_HANDLE(
         heap_ctor(&node, val, ind, NULL, NULL, NULL, 0)
     );
 
-    heap_infos[ind].node = node;
-    heap_infos[ind].heap = heap;
+    heaps->nodes_info[ind].node = node;
+    heaps->nodes_info[ind].heap = heap;
 
     ERROR_HANDLE(
-        heap_trans(&node, heap),
+        heap_trans(heaps, &node, heap),
         heap_dtor(node);
     );
 
     return EXIT_SUCCESS;
 }
 
-int heap_trans(heap_t** src, heap_t** dst) 
+int heap_trans(heaps_t* heaps, heap_t** src, heap_t** dst) 
 {
     assert(src);
     assert(dst);
+    assert(heaps);
 
     heap_t* h1 = *src;
     heap_t* h2 = *dst;
@@ -334,7 +348,7 @@ int heap_trans(heap_t** src, heap_t** dst)
     {
         *dst = h1;
         *src = NULL;
-        update_heap(*dst, dst);
+        update_heap(heaps, *dst, dst);
         return EXIT_SUCCESS;
     }
 
@@ -417,15 +431,17 @@ int heap_trans(heap_t** src, heap_t** dst)
     *src = NULL;
     *dst = new_root;
 
-    update_heap(*dst, dst);
+    update_heap(heaps, *dst, dst);
 
     return EXIT_SUCCESS;
 }
 
 
-static int decrease_key(heap_t* node, int64_t val) {
+static int decrease_key(heaps_t* heaps, heap_t* node, int64_t val) 
+{
     assert(node);
     assert(val <= node->key);
+    assert(heaps);
 
     heap_t* parent_node = node->parent;
 
@@ -434,8 +450,8 @@ static int decrease_key(heap_t* node, int64_t val) {
     
     while (parent_node && node->key < parent_node->key) 
     {
-        heap_infos[node->ind].node = parent_node;
-        heap_infos[parent_node->ind].node = node;
+        heaps->nodes_info[node->ind].node = parent_node;
+        heaps->nodes_info[parent_node->ind].node = node;
 
         swap_int64_t(&node->key, &parent_node->key);
         swap_size_t(&node->ind, &parent_node->ind);
@@ -447,29 +463,31 @@ static int decrease_key(heap_t* node, int64_t val) {
     return EXIT_SUCCESS;
 }
 
-static int erase_by_ptr(heap_t** heap, heap_t* node) 
+static int erase_by_ptr(heaps_t* heaps, heap_t** heap, heap_t* node) 
 {
     assert(heap);
     assert(node);
+    assert(heaps);
 
-    ERROR_HANDLE(decrease_key(node, INT64_MIN));
-    ERROR_HANDLE(heap_erase_min(heap));
-
-    return EXIT_SUCCESS;
-}
-
-int heap_erase(size_t ind)
-{
-
-    ERROR_HANDLE(erase_by_ptr(heap_infos[ind].heap, heap_infos[ind].node));
+    ERROR_HANDLE(decrease_key(heaps, node, INT64_MIN));
+    ERROR_HANDLE(heap_erase_min(heaps, heap));
 
     return EXIT_SUCCESS;
 }
 
-int heap_update(size_t ind, int64_t val) 
+int heap_erase(heaps_t* heaps, size_t ind)
 {
 
-    heap_t* node = heap_infos[ind].node;
+    ERROR_HANDLE(erase_by_ptr(heaps, heaps->nodes_info[ind].heap, heaps->nodes_info[ind].node));
+
+    return EXIT_SUCCESS;
+}
+
+int heap_update(heaps_t* heaps, size_t ind, int64_t val) 
+{
+    assert(heaps);
+
+    heap_t* node = heaps->nodes_info[ind].node;
 
     if (val == node->key) 
     {
@@ -478,22 +496,23 @@ int heap_update(size_t ind, int64_t val)
 
     if (val < node->key) {
         ERROR_HANDLE(
-            decrease_key(node, val)
+            decrease_key(heaps, node, val)
         );
 
         return EXIT_SUCCESS;
     }
 
-    ERROR_HANDLE(erase_by_ptr(heap_infos[ind].heap, node));
-    ERROR_HANDLE(heap_insert(heap_infos[ind].heap, val, ind));
+    ERROR_HANDLE(erase_by_ptr(heaps, heaps->nodes_info[ind].heap, node));
+    ERROR_HANDLE(heap_insert(heaps, heaps->nodes_info[ind].heap, val, ind));
 
     return EXIT_SUCCESS;
 }
 
 
-int heap_get_min(heap_t* heap, int64_t* min) 
+int heap_get_min(heaps_t* heaps, heap_t* heap, int64_t* min) 
 {
     assert(heap);
+    assert(heaps);
 
     *min = heap->key;
 
@@ -506,7 +525,7 @@ int heap_get_min(heap_t* heap, int64_t* min)
     return EXIT_SUCCESS;
 }
 
-int heap_erase_min(heap_t** heap) 
+int heap_erase_min(heaps_t* heaps, heap_t** heap) 
 {
     assert(heap);
 
@@ -550,12 +569,12 @@ int heap_erase_min(heap_t** heap)
         child = next;
     }
 
-    heap_infos[min_node->ind].node = NULL;
+    heaps->nodes_info[min_node->ind].node = NULL;
 
     free(min_node);
 
     if (rev_children) {
-        heap_trans(&rev_children, heap);
+        heap_trans(heaps, &rev_children, heap);
     }
 
     return EXIT_SUCCESS;

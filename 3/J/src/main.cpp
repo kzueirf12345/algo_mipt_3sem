@@ -5,9 +5,6 @@
 #include <cctype>
 
 int main() {
-    std::ios::sync_with_stdio(false);
-    std::cin.tie(nullptr);
-
     std::string input = {};
     std::getline(std::cin, input);
     std::vector<std::string> strStack = {};

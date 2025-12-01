@@ -7,6 +7,11 @@
 struct Coord {
     int x;
     int y;
+
+    bool operator==(const Coord& other) const {
+        return x == other.x && y == other.y;
+    }
+
 };
 
 struct HashCoord {
@@ -15,16 +20,8 @@ struct HashCoord {
     }
 };
 
-bool operator==(const Coord& a, const Coord& b);
-
-bool operator==(const Coord& a, const Coord& b) {
-    return a.x == b.x && a.y == b.y;
-}
 
 int main() {
-    std::ios::sync_with_stdio(false);
-    std::cin.tie(nullptr);
-
     size_t n = 0, m = 0, l = 0, k = 0;
     std::cin >> n >> m >> l >> k;
 

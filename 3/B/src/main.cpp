@@ -10,9 +10,6 @@ struct PlayerInfo {
 };
 
 int main() {
-    std::ios::sync_with_stdio(false);
-    std::cin.tie(nullptr);
-
     size_t M = 0, N = 0;
     std::cin >> M >> N;
 

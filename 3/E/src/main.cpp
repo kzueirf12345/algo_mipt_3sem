@@ -14,9 +14,6 @@ struct VectorHash {
 };
 
 int main() {
-    std::ios::sync_with_stdio(false);
-    std::cin.tie(nullptr);
-
     size_t N, M, K;
     std::cin >> N >> M >> K;
 

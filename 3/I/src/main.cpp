@@ -5,9 +5,6 @@
 #include <set>
 
 int main() {
-    std::ios::sync_with_stdio(false);
-    std::cin.tie(nullptr);
-
     size_t N = 0, M = 0;
     std::cin >> N >> M;
 

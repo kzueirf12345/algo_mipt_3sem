@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <iostream>
 #include <unordered_set>
 #include <cstdint>
@@ -21,18 +22,21 @@ static Node* root = new Node();
 
 int main()
 {
-    std::ios::sync_with_stdio(false);
-    std::cin.tie(nullptr);
-
     std::unordered_set<uint32_t> present = {};
 
     size_t n = 0;
-    std::cin >> n;
+
+    if (scanf("%zu", &n) != 1) {
+        return EXIT_FAILURE;
+    }
 
     for (size_t i = 0; i < n; ++i) {
         size_t type = 0;
         uint32_t val = 0;
-        std::cin >> type >> val;
+
+        if (scanf("%zu %u", &type, &val) != 2) {
+            return EXIT_FAILURE;
+        }
 
         if (type == 1) 
         {
@@ -52,12 +56,12 @@ int main()
         {
             if (present.empty()) 
             {
+                printf("0\n");
                 std::cout << 0 << '\n';
             } 
             else 
             {
-                size_t ans = QueryTrie(val);
-                std::cout << ans << '\n';
+                printf("%u\n", QueryTrie(val));
             }
         }
     }

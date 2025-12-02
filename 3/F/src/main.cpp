@@ -1,68 +1,77 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
+#include <cstdio>
+#include <cstdlib>
+#include <vector>
+#include <algorithm>
+#include <cstdint>
 
-int compare(const void *a, const void *b);
-
-int compare(const void *a, const void *b) {
-    int32_t x = *(const int32_t*)a;
-    int32_t y = *(const int32_t*)b;
-    return (x > y) - (x < y);
-}
+struct Item {
+    int32_t value;
+    uint16_t setId;
+};
 
 int main() {
-    uint32_t N, M;
+    uint32_t N = 0, M = 0;
     if (scanf("%u %u", &N, &M) != 2) {
         return EXIT_FAILURE;
     }
-    
-    int32_t **sets = (int32_t**)calloc(N, sizeof(int32_t*));
-    
-    for (uint32_t i = 0; i < N; ++i) {
-        sets[i] = (int32_t*)calloc(M, sizeof(int32_t));
-        
+
+    std::vector<Item> allItems;
+    allItems.reserve(N * M);
+
+    for (uint16_t s = 0; s < N; ++s) {
         for (uint32_t j = 0; j < M; ++j) {
-            if (scanf("%d", &sets[i][j]) != 1) {
+            Item it = {.value = 0, .setId = s};
+            if (scanf("%d", &it.value) != 1) {
                 return EXIT_FAILURE;
             }
+            allItems.push_back(it);
         }
-        
-        qsort(sets[i], M, sizeof(int32_t), compare);
     }
-    
-    uint16_t maxIntersection = 0;
-    
-    for (uint32_t i = 0; i < N; ++i) {
-        for (uint32_t j = i + 1; j < N; ++j) {
-            uint16_t count = 0;
-            uint32_t idx1 = 0, idx2 = 0;
-            int32_t *arr1 = sets[i];
-            int32_t *arr2 = sets[j];
-            
-            while (idx1 < M && idx2 < M) {
-                if (arr1[idx1] == arr2[idx2]) {
-                    ++count;
-                    ++idx1;
-                    ++idx2;
-                } else if (arr1[idx1] < arr2[idx2]) {
-                    ++idx1;
-                } else {
-                    ++idx2;
+
+    std::sort(
+        allItems.begin(), 
+        allItems.end(),
+        [](const Item &a, const Item &b) {
+            return a.value < b.value;
+        }
+    );
+
+    std::vector<uint16_t> pairCnt(N * N, 0);
+    uint16_t res = 0;
+
+    size_t pos = 0;
+    const size_t items_cnt = allItems.size();
+
+    while (pos < items_cnt) {
+        const int32_t curVal = allItems[pos].value;
+        size_t start = pos;
+
+        while (pos < items_cnt && allItems[pos].value == curVal) {
+            ++pos;
+        }
+
+        // тут pos - последний элемент со значением curVal
+
+        for (size_t i = start; i < pos; ++i) {
+            for (size_t j = i + 1; j < pos; ++j) {
+                uint16_t a = allItems[i].setId;
+                uint16_t b = allItems[j].setId;
+
+                if (a > b) {
+                    std::swap(a, b);
+                }
+
+                uint32_t index = (uint32_t)a * N + b;
+
+                ++pairCnt[index];
+
+                if (pairCnt[index] > res) {
+                    res = pairCnt[index];
                 }
             }
-            
-            if (count > maxIntersection) {
-                maxIntersection = count;
-            }
         }
     }
-    
-    printf("%u\n", maxIntersection);
-    
-    for (uint32_t i = 0; i < N; ++i) {
-        free(sets[i]);
-    }
-    free(sets);
-    
+
+    printf("%hu\n", res);
     return 0;
 }

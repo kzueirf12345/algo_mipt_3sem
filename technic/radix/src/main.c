@@ -1,8 +1,9 @@
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdalign.h>
+#include <stdio.h>
 
 // void fast_sort(unsigned *begin, unsigned *end);
 
@@ -17,75 +18,98 @@
 //     fprintf(stderr, "\n");
 // }
 
-void fast_sort(unsigned *begin, unsigned *end) 
+void fast_sort(unsigned *begin, unsigned *end)
 {
-    size_t n = end - begin;
+    size_t n = (size_t)(end - begin);
     if (n <= 1) return;
 
-    alignas(64) unsigned *temp = (unsigned*)calloc(n, sizeof(unsigned));
+    unsigned *buf = (unsigned*)malloc(n * sizeof(unsigned));
+
     unsigned *src = begin;
-    unsigned *dst = temp;
+    unsigned *dst = buf;
 
     alignas(64) size_t count[256];
 
-    const size_t blockSize = 4096;
+    const size_t n8 = n & (~(size_t)7); // округление до ближайшего кратного 8
 
-    for (int shift = 0; shift < 32; shift += 8) {
+    for (size_t shift = 0; shift < 32; shift += 8)
+    {
         memset(count, 0, sizeof(count));
 
-        for (size_t start = 0; start < n; start += blockSize) {
-            size_t endBlock = (start + blockSize < n) ? start + blockSize : n;
-            size_t i = start;
+        size_t ind = 0;
 
-            for (; i + 3 < endBlock; i += 4) {
-                unsigned b0 = (src[i] >> shift) & 0xFF;
-                unsigned b1 = (src[i+1] >> shift) & 0xFF;
-                unsigned b2 = (src[i+2] >> shift) & 0xFF;
-                unsigned b3 = (src[i+3] >> shift) & 0xFF;
+        for (; ind < n8; ind += 8) 
+        {
+            unsigned v0 = src[ind];
+            unsigned v1 = src[ind+1];
+            unsigned v2 = src[ind+2];
+            unsigned v3 = src[ind+3];
+            unsigned v4 = src[ind+4];
+            unsigned v5 = src[ind+5];
+            unsigned v6 = src[ind+6];
+            unsigned v7 = src[ind+7];
 
-                ++count[b0]; ++count[b1]; ++count[b2]; ++count[b3];
-            }
-            for (; i < endBlock; ++i) {
-                ++count[(src[i] >> shift) & 0xFF];
-            }
+            ++count[(v0 >> shift) & 255u];
+            ++count[(v1 >> shift) & 255u];
+            ++count[(v2 >> shift) & 255u];
+            ++count[(v3 >> shift) & 255u];
+            ++count[(v4 >> shift) & 255u];
+            ++count[(v5 >> shift) & 255u];
+            ++count[(v6 >> shift) & 255u];
+            ++count[(v7 >> shift) & 255u];
         }
+        for (; ind < n; ++ind)
+        {
+            ++count[(src[ind] >> shift) & 255u];
+        }
+        
 
         size_t sum = 0;
-        for (int i = 0; i < 256; ++i) {
-            size_t tmp = count[i];
+        for (size_t i = 0; i < 256; ++i) 
+        {
+            size_t t = count[i];
             count[i] = sum;
-            sum += tmp;
+            sum += t;
         }
 
-        for (size_t start = 0; start < n; start += blockSize) {
-            size_t endBlock = (start + blockSize < n) ? start + blockSize : n;
-            size_t i = start;
+        
+        ind = 0;
 
-            for (; i + 3 < endBlock; i += 4) {
-                unsigned b0 = (src[i] >> shift) & 0xFF;
-                unsigned b1 = (src[i+1] >> shift) & 0xFF;
-                unsigned b2 = (src[i+2] >> shift) & 0xFF;
-                unsigned b3 = (src[i+3] >> shift) & 0xFF;
+        for (; ind < n8; ind += 8) 
+        {
+            unsigned v0 = src[ind];
+            unsigned v1 = src[ind+1];
+            unsigned v2 = src[ind+2];
+            unsigned v3 = src[ind+3];
+            unsigned v4 = src[ind+4];
+            unsigned v5 = src[ind+5];
+            unsigned v6 = src[ind+6];
+            unsigned v7 = src[ind+7];
 
-                dst[count[b0]++] = src[i];
-                dst[count[b1]++] = src[i+1];
-                dst[count[b2]++] = src[i+2];
-                dst[count[b3]++] = src[i+3];
-            }
-            for (; i < endBlock; ++i) {
-                unsigned b = (src[i] >> shift) & 0xFF;
-                dst[count[b]++] = src[i];
-            }
+            dst[count[(v0 >> shift) & 255u]++] = v0;
+            dst[count[(v1 >> shift) & 255u]++] = v1;
+            dst[count[(v2 >> shift) & 255u]++] = v2;
+            dst[count[(v3 >> shift) & 255u]++] = v3;
+            dst[count[(v4 >> shift) & 255u]++] = v4;
+            dst[count[(v5 >> shift) & 255u]++] = v5;
+            dst[count[(v6 >> shift) & 255u]++] = v6;
+            dst[count[(v7 >> shift) & 255u]++] = v7;
         }
-
-        unsigned *tmpPtr = src;
+        for (; ind < n; ++ind) 
+        {
+            unsigned v = src[ind];
+            dst[count[(v >> shift) & 255u]++] = v;
+        }
+    
+        unsigned *tmp = src;
         src = dst;
-        dst = tmpPtr;
+        dst = tmp;
     }
 
-    if (src != begin) {
+    if (src != begin) 
+    {
         memcpy(begin, src, n * sizeof(unsigned));
     }
 
-    free(temp);
+    free(buf);
 }

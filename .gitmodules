@@ -1,3 +1,6 @@
 [submodule "b_tree/libs/logger"]
 	path = b_tree/libs/logger
 	url = https://github.com/kzueirf12345/logger.git
+[submodule "mo"]
+	path = mo
+	url = git@github.com:kzueirf12345/mo.git

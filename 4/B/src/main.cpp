@@ -80,10 +80,16 @@ public:
     using Vertex = uint64_t;
     
     struct Edge {
+
         using Vertex = uint64_t;
+
         Vertex& src;
         Vertex& dst;
-        Edge(Vertex& src, Vertex& dst) : src(src), dst(dst) {}
+
+        Edge(Vertex& src, Vertex& dst) noexcept
+            : src(src), dst(dst) 
+        {}
+
     };
 
 public:
@@ -121,12 +127,13 @@ class PlainGraph: public CommonGraph {
 
 public:
 
-    [[nodiscard]] bool                    isTree()                const;
-    [[nodiscard]] bool                    isForest()              const;
-    [[nodiscard]] size_t                  nJointComponents()      const;
-    [[nodiscard]] std::vector<uint64_t>   getJointComponents()    const; //vec[vertex] = id_comp 
-    [[nodiscard]] std::vector<Edge>       getBridges()            const;
-    [[nodiscard]] std::vector<Vertex>     getArticulationPoints() const;
+    [[nodiscard]] bool                    isTree                ()  const;
+    [[nodiscard]] bool                    isForest              ()  const;
+    [[nodiscard]] size_t                  nJointComponents      ()  const;
+    [[nodiscard]] std::vector<uint64_t>   getJointComponents    ()  const; //vec[vertex] = id_comp 
+
+    [[nodiscard]] std::vector<Edge>       getBridges            ()  const;
+    [[nodiscard]] std::vector<Vertex>     getArticulationPoints ()  const;
 
 };
 
@@ -140,5 +147,5 @@ public:
     [[nodiscard]]   DirectionalGraph                                    reverse     ()  const;
     [[nodiscard]]   std::vector<Vertex>                                 topological ()  const;
     [[nodiscard]]   std::pair<DirectionalGraph, std::vector<Vertex>>    condence    ()  const;
-    
+
 };

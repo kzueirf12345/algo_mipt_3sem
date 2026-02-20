@@ -131,7 +131,6 @@ public:
     [[nodiscard]] bool                    isForest              ()  const;
     [[nodiscard]] size_t                  nJointComponents      ()  const;
     [[nodiscard]] std::vector<uint64_t>   getJointComponents    ()  const; //vec[vertex] = id_comp 
-
     [[nodiscard]] std::vector<Edge>       getBridges            ()  const;
     [[nodiscard]] std::vector<Vertex>     getArticulationPoints ()  const;
 
@@ -149,3 +148,98 @@ public:
     [[nodiscard]]   std::pair<DirectionalGraph, std::vector<Vertex>>    condence    ()  const;
 
 };
+
+//==================================================================================================
+// CommonGraph
+//==================================================================================================
+
+CommonGraph::Vertex CommonGraph::addVertex() {
+// TODO implement
+}
+
+bool CommonGraph::addEdge(CommonGraph::Vertex& src, CommonGraph::Vertex& dst) {
+// TODO implement
+}
+
+//--------------------------------------------------------------------------------------------------
+
+size_t CommonGraph::nVertices() const {
+// TODO implement
+}
+
+size_t CommonGraph::nEdges() const {
+// TODO implement
+}
+
+bool CommonGraph::has(CommonGraph::Edge edge) const {
+// TODO implement
+}
+std::vector<CommonGraph::Vertex> CommonGraph::getAdjuscent(CommonGraph::Vertex vertex) const {
+// TODO implement
+}
+
+//--------------------------------------------------------------------------------------------------
+
+CommonGraph::ErrorCode CommonGraph::validate() const {
+// TODO implement
+}
+
+void CommonGraph::dump(const char* filename) const {
+// TODO implement
+}
+
+//==================================================================================================
+// PlainGraph
+//==================================================================================================
+
+bool PlainGraph::isTree() const {
+// TODO implement
+}
+
+bool PlainGraph::isForest() const {
+// TODO implement
+}
+
+size_t PlainGraph::nJointComponents() const {
+// TODO implement
+}
+
+std::vector<uint64_t> PlainGraph::getJointComponents() const {
+// TODO implement
+}
+
+std::vector<PlainGraph::Edge> PlainGraph::getBridges() const {
+// TODO implement
+}
+
+std::vector<PlainGraph::Vertex> PlainGraph::getArticulationPoints() const {
+// TODO implement
+}
+
+//==================================================================================================
+// DirectionalGraph
+//==================================================================================================
+
+bool DirectionalGraph::isDAG() const {
+// TODO implement
+}
+
+std::vector<DirectionalGraph::Vertex> DirectionalGraph::getSources() const {
+// TODO implement
+}
+
+std::vector<DirectionalGraph::Vertex> DirectionalGraph::getSinks() const {
+// TODO implement
+}
+
+DirectionalGraph DirectionalGraph::reverse() const {
+// TODO implement
+}
+
+std::vector<DirectionalGraph::Vertex> DirectionalGraph::topological() const {
+// TODO implement
+}
+
+std::pair<DirectionalGraph, std::vector<DirectionalGraph::Vertex>> DirectionalGraph::condence() const {
+// TODO implement
+}

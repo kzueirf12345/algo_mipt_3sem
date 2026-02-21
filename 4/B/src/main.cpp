@@ -69,8 +69,10 @@ namespace traits {
 
 */
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <vector>
 
 class CommonGraph {
@@ -94,13 +96,13 @@ public:
 
 public:
     
-                    Vertex              addVertex   ()                                  ;
-                    bool                addEdge     (Vertex& src, Vertex& dst)          ;
+                    virtual Vertex              addVertex   ()                                              ;
+                    virtual bool                addEdge     (Vertex src, Vertex dst)                    = 0 ;
     
-    [[nodiscard]]   size_t              nVertices   ()                          const   ;
-    [[nodiscard]]   size_t              nEdges      ()                          const   ;
-    [[nodiscard]]   bool                has         (Edge edge)                 const   ;
-    [[nodiscard]]   std::vector<Vertex> getAdjuscent(Vertex vertex)             const   ;
+    [[nodiscard]]   virtual size_t              nVertices   ()                          const noexcept      ;
+    [[nodiscard]]   virtual size_t              nEdges      ()                          const           = 0 ;
+    [[nodiscard]]   virtual bool                has         (Edge edge)                 const               ;
+    [[nodiscard]]   virtual std::vector<Vertex> getAdjuscent(Vertex vertex)             const noexcept      ;
 
 public:
 
@@ -108,18 +110,13 @@ public:
         NoError = 0
     };
 
-    [[nodiscard]]   ErrorCode           validate    ()                          const   ;
-                    void                dump        (const char* filename)      const   ;
+    [[nodiscard]]   virtual ErrorCode           validate    ()                          const           = 0 ;
+                    virtual void                dump        (const char* filename)      const           = 0 ;
 
 protected:
 
-    /*!SECTION
-    something for get and set adj_ 
-    */
-
-private:
-
     std::vector<std::vector<Vertex>> adj_;
+
 };
 
 
@@ -127,12 +124,39 @@ class PlainGraph: public CommonGraph {
 
 public:
 
-    [[nodiscard]] bool                    isTree                ()  const;
-    [[nodiscard]] bool                    isForest              ()  const;
-    [[nodiscard]] size_t                  nJointComponents      ()  const;
-    [[nodiscard]] std::vector<uint64_t>   getJointComponents    ()  const; //vec[vertex] = id_comp 
-    [[nodiscard]] std::vector<Edge>       getBridges            ()  const;
-    [[nodiscard]] std::vector<Vertex>     getArticulationPoints ()  const;
+    using Component = uint64_t;
+
+    static inline constexpr Component POISON_COMPONENT_NUM = std::numeric_limits<Component>::max();
+
+public:
+
+                    virtual bool                    addEdge                 (Vertex src, Vertex dst)                                    override    final   ;
+    [[nodiscard]]   virtual size_t                  nEdges                  ()                                      const   noexcept    override    final   ;
+
+    [[nodiscard]]   virtual ErrorCode               validate                ()                                      const               override    final   ;
+                    virtual void                    dump                    (const char* filename)                  const               override    final   ;
+
+public:
+
+    [[nodiscard]]           bool                    isTree                  ()                                      const                                   ;
+    [[nodiscard]]           bool                    isForest                ()                                      const                                   ;
+    [[nodiscard]]           size_t                  nJointComponents        ()                                      const                                   ;
+    [[nodiscard]]           std::vector<Component>  getJointComponents      ()                                      const                                   ; //vec[vertex] = id_comp 
+    [[nodiscard]]           std::vector<Edge>       getBridges              ()                                      const                                   ;
+    [[nodiscard]]           std::vector<Vertex>     getArticulationPoints   ()                                      const                                   ;
+
+private:
+
+                            bool                    hasCycleHelper          (Vertex vertex, 
+                                                                             std::vector<bool>& visited, 
+                                                                             Vertex parent)                         const                                   ;
+
+                            void                    markJointComponent      (Vertex vertex, 
+                                                                             std::vector<bool>& visited)            const                                   ;
+
+                            void                    fillJointComponent      (Vertex vertex, 
+                                                                             std::vector<Component>& components,
+                                                                             PlainGraph::Component component)       const                                   ;
 
 };
 
@@ -140,12 +164,20 @@ class DirectionalGraph: public CommonGraph {
 
 public:
 
-    [[nodiscard]]   bool                                                isDAG       ()  const;
-    [[nodiscard]]   std::vector<Vertex>                                 getSources  ()  const;
-    [[nodiscard]]   std::vector<Vertex>                                 getSinks    ()  const;
-    [[nodiscard]]   DirectionalGraph                                    reverse     ()  const;
-    [[nodiscard]]   std::vector<Vertex>                                 topological ()  const;
-    [[nodiscard]]   std::pair<DirectionalGraph, std::vector<Vertex>>    condence    ()  const;
+                    virtual bool                                                addEdge     (Vertex src, Vertex dst)                        override    final   ;
+    [[nodiscard]]   virtual size_t                                              nEdges      ()                          const   noexcept    override    final   ;
+
+    [[nodiscard]]   virtual ErrorCode                                           validate    ()                          const               override    final   ;
+                    virtual void                                                dump        (const char* filename)      const               override    final   ;
+
+public:
+
+    [[nodiscard]]           bool                                                isDAG       ()                          const                                   ;
+    [[nodiscard]]           std::vector<Vertex>                                 getSources  ()                          const                                   ;
+    [[nodiscard]]           std::vector<Vertex>                                 getSinks    ()                          const                                   ;
+    [[nodiscard]]           DirectionalGraph                                    reverse     ()                          const                                   ;
+    [[nodiscard]]           std::vector<Vertex>                                 topological ()                          const                                   ;
+    [[nodiscard]]           std::pair<DirectionalGraph, std::vector<Vertex>>    condence    ()                          const                                   ;
 
 };
 
@@ -154,58 +186,147 @@ public:
 //==================================================================================================
 
 CommonGraph::Vertex CommonGraph::addVertex() {
-// TODO implement
-}
-
-bool CommonGraph::addEdge(CommonGraph::Vertex& src, CommonGraph::Vertex& dst) {
-// TODO implement
+    adj_.push_back({});
+    return adj_.size() - 1;
 }
 
 //--------------------------------------------------------------------------------------------------
 
-size_t CommonGraph::nVertices() const {
-// TODO implement
-}
-
-size_t CommonGraph::nEdges() const {
-// TODO implement
+size_t CommonGraph::nVertices() const noexcept {
+    return adj_.size();
 }
 
 bool CommonGraph::has(CommonGraph::Edge edge) const {
-// TODO implement
-}
-std::vector<CommonGraph::Vertex> CommonGraph::getAdjuscent(CommonGraph::Vertex vertex) const {
-// TODO implement
+    return std::binary_search(adj_[edge.src].begin(), adj_[edge.src].end(), edge.dst);
 }
 
-//--------------------------------------------------------------------------------------------------
-
-CommonGraph::ErrorCode CommonGraph::validate() const {
-// TODO implement
-}
-
-void CommonGraph::dump(const char* filename) const {
-// TODO implement
+std::vector<CommonGraph::Vertex> CommonGraph::getAdjuscent(
+    CommonGraph::Vertex vertex
+) const noexcept {
+    return adj_[vertex];
 }
 
 //==================================================================================================
 // PlainGraph
 //==================================================================================================
 
+bool PlainGraph::addEdge(PlainGraph::Vertex src, PlainGraph::Vertex dst) try {
+    if (src >= adj_.size()) {
+        return false;
+    }
+    if (dst >= adj_.size()) {
+        return false;
+    }
+    if (src == dst) {
+        return false;
+    }
+
+    {
+        auto& src_neighbors = adj_[src];
+    
+        const auto dst_it = std::lower_bound(src_neighbors.begin(), src_neighbors.end(), dst);
+        
+        if (*dst_it == dst) {
+            return false;
+        }
+    
+        src_neighbors.insert(dst_it, dst);
+    } 
+
+    {
+        auto& dst_neighbors = adj_[dst];
+    
+        const auto src_it = std::lower_bound(dst_neighbors.begin(), dst_neighbors.end(), src);
+        
+        if (*src_it == src) {
+            return false;
+        }
+    
+        dst_neighbors.insert(src_it, src);
+    }
+
+    return true;
+}
+catch (...) {
+    return false;
+}
+
+size_t PlainGraph::nEdges() const noexcept {
+    size_t nEdges = 0;
+
+    for (const auto& neighbors : adj_) {
+        nEdges += neighbors.size();
+    }
+
+    return nEdges / 2;
+}
+
+PlainGraph::ErrorCode PlainGraph::validate() const {
+    //TODO implement
+}
+
+void PlainGraph::dump(const char* filename) const {
+   //TODO implement 
+}
+
+//--------------------------------------------------------------------------------------------------
+
 bool PlainGraph::isTree() const {
-// TODO implement
+
+    std::vector<bool> visited(adj_.size(), false);
+
+    if (hasCycleHelper(0, visited, 0)) {
+        return false;
+    }
+
+    return !std::any_of(visited.begin(), visited.end(), false);
 }
 
 bool PlainGraph::isForest() const {
-// TODO implement
+
+    std::vector<bool> visited(adj_.size(), false);
+
+    for (Vertex vertex = 0; vertex < adj_.size(); ++vertex) {
+        if (!visited[vertex]) {
+            if (hasCycleHelper(0, visited, 0)) {
+                return false;
+            }
+        }
+    }
+
+    return true;
 }
 
 size_t PlainGraph::nJointComponents() const {
-// TODO implement
+
+    std::vector<bool> visited(adj_.size(), false);
+
+    size_t nJointComponents = 0;
+
+    for (Vertex vertex = 0; vertex < adj_.size(); ++vertex) {
+        if (!visited[vertex]) {
+            markJointComponent(vertex, visited);
+            ++nJointComponents;
+        }
+    }
+
+    return nJointComponents;
 }
 
-std::vector<uint64_t> PlainGraph::getJointComponents() const {
-// TODO implement
+std::vector<PlainGraph::Component> PlainGraph::getJointComponents() const {
+
+    std::vector<PlainGraph::Component> components(adj_.size(), POISON_COMPONENT_NUM);
+
+    PlainGraph::Component component = 0;
+
+    for (Vertex vertex = 0; vertex < adj_.size(); ++vertex) {
+        if (components[vertex] == POISON_COMPONENT_NUM) {
+            fillJointComponent(vertex, components, component);
+            ++component;
+        }
+    }
+
+    return components;
 }
 
 std::vector<PlainGraph::Edge> PlainGraph::getBridges() const {
@@ -216,9 +337,107 @@ std::vector<PlainGraph::Vertex> PlainGraph::getArticulationPoints() const {
 // TODO implement
 }
 
+//--------------------------------------------------------------------------------------------------
+
+bool PlainGraph::hasCycleHelper(
+    PlainGraph::Vertex vertex, 
+    std::vector<bool>& visited, 
+    PlainGraph::Vertex parent
+) const {
+
+    visited[vertex] = true;
+
+    for (auto neighbor : adj_[vertex]) {
+        if (!visited[neighbor]) {
+            if (hasCycleHelper(neighbor, visited, vertex)) {
+                return true;
+            }
+        }
+        else if (neighbor != parent) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void PlainGraph::markJointComponent(PlainGraph::Vertex vertex, std::vector<bool>& visited) const {
+
+    visited[vertex] = true;
+
+    for (auto neighbor : adj_[vertex]) {
+        if (!visited[neighbor]) {
+            markJointComponent(neighbor, visited);
+        }
+    }
+}
+
+void PlainGraph::fillJointComponent(
+    PlainGraph::Vertex vertex, 
+    std::vector<PlainGraph::Component>& components,
+    PlainGraph::Component component
+) const {
+
+    components[vertex] = component;
+
+    for (auto neighbor : adj_[vertex]) {
+        if (components[vertex] != component) {
+            fillJointComponent(neighbor, components, component);
+        }
+    }
+
+}
+
 //==================================================================================================
 // DirectionalGraph
 //==================================================================================================
+
+bool DirectionalGraph::addEdge(DirectionalGraph::Vertex src, DirectionalGraph::Vertex dst) try {
+    if (src >= adj_.size()) {
+        return false;
+    }
+    if (dst >= adj_.size()) {
+        return false;
+    }
+    if (src == dst) {
+        return false;
+    }
+    
+    auto& src_neighbors = adj_[src];
+
+    const auto dst_it = std::lower_bound(src_neighbors.begin(), src_neighbors.end(), dst);
+    
+    if (*dst_it == dst) {
+        return false;
+    }
+
+    src_neighbors.insert(dst_it, dst);
+
+    return true;
+}
+catch (...) {
+    return false;
+}
+
+size_t DirectionalGraph::nEdges() const noexcept {
+    size_t nEdges = 0;
+
+    for (const auto& neighbors : adj_) {
+        nEdges += neighbors.size();
+    }
+
+    return nEdges;
+}
+
+DirectionalGraph::ErrorCode DirectionalGraph::validate() const {
+    //TODO implement
+}
+
+void DirectionalGraph::dump(const char* filename) const {
+   //TODO implement 
+}
+
+//--------------------------------------------------------------------------------------------------
 
 bool DirectionalGraph::isDAG() const {
 // TODO implement

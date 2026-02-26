@@ -537,6 +537,8 @@ void PlainGraph::FindArticulationPointHelper(
 
     int64_t children = 0;
 
+    bool is_articulation_point = false;
+
     for (size_t neighbour_ind = 0; neighbour_ind < adj_[vertex].size(); ++neighbour_ind) {
         Vertex neighbour = adj_[vertex][neighbour_ind];
         if (neighbour == parent) {
@@ -560,13 +562,15 @@ void PlainGraph::FindArticulationPointHelper(
             fup[vertex] = std::min(fup[vertex], fup[neighbour]);
 
             if (fup[neighbour] > tin[vertex] && parent != VERTEX_POISON) { // не корень
-                articulation_points.push_back(vertex);
+                is_articulation_point = true;
             }
             ++children;
         }
     }
 
-    if (parent == VERTEX_POISON && children > 1) { // корень
+    if (is_articulation_point 
+     || (parent == VERTEX_POISON && children > 1) // корень
+    ) {
         articulation_points.push_back(vertex);
     }
 }

@@ -1,6 +1,6 @@
 /*!SECTION
-В этой задаче вам предлагается разработать свою мини библиотеку для работы с невзвешенными графами 
-без петель и кратных ребер. Реализуйте структуры данных PlainGraph и DiectionalGraph и методы работы 
+В этой задаче вам предлагается разработать свою мини библиотеку для работы с невзвешенными графами. 
+Реализуйте структуры данных PlainGraph и DiectionalGraph и методы работы 
 с ними.
 
 Ваши типы (или type-alias) должны удовлетворять соответсвующем концептам. 
@@ -13,7 +13,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include <limits>
-#include <stdexcept>
 #include <vector>
 #include <cassert>
 #include <fstream>
@@ -115,8 +114,6 @@ public:
     enum ErrorCode {
         NoError             = 0,
         NotSortedNeighbours = 1,
-        MultiEdges          = 2,
-        Loop                = 3,
         Asymmetrical        = 4,
         InvalidNeighbourNum = 5,
         Undirected          = 6,
@@ -261,12 +258,18 @@ size_t CommonGraph::nVertices() const noexcept {
 }
 
 bool CommonGraph::has(CommonGraph::Edge edge) const {
+    if (edge.src >= adj_.size() || edge.dst >= adj_.size()) {
+        return false;
+    }
     return std::binary_search(adj_[edge.src].begin(), adj_[edge.src].end(), edge.dst);
 }
 
 std::vector<CommonGraph::Vertex> CommonGraph::getAdjuscent(
     CommonGraph::Vertex vertex
 ) const noexcept {
+    if (vertex >= adj_.size()) {
+        return {};
+    }
     return adj_[vertex];
 }
 
@@ -281,18 +284,11 @@ bool PlainGraph::addEdge(PlainGraph::Vertex src, PlainGraph::Vertex dst) {
     if (dst >= adj_.size()) {
         return false;
     }
-    if (src == dst) {
-        return false;
-    }
 
     {
         auto& src_neighbors = adj_[src];
     
         const auto dst_it = std::lower_bound(src_neighbors.begin(), src_neighbors.end(), dst);
-        
-        if (dst_it != src_neighbors.end() && *dst_it == dst) {
-            return false;
-        }
     
         src_neighbors.insert(dst_it, dst);
     } 
@@ -301,10 +297,6 @@ bool PlainGraph::addEdge(PlainGraph::Vertex src, PlainGraph::Vertex dst) {
         auto& dst_neighbors = adj_[dst];
     
         const auto src_it = std::lower_bound(dst_neighbors.begin(), dst_neighbors.end(), src);
-        
-        if (src_it != dst_neighbors.end() && *src_it == src) {
-            return false;
-        }
     
         dst_neighbors.insert(src_it, src);
     }
@@ -332,18 +324,7 @@ PlainGraph::ErrorCode PlainGraph::validate() const {
         if (!std::is_sorted(neighbors.begin(), neighbors.end())) {
             return ErrorCode::NotSortedNeighbours;
         }
-        
-        // Не должно быть дубликатов (кратные рёбра)
-        if (!neighbors.empty() && 
-            std::adjacent_find(neighbors.begin(), neighbors.end()) != neighbors.end()) {
-            return ErrorCode::MultiEdges;
-        }
-        
-        // Не должно быть петель
-        if (std::binary_search(neighbors.begin(), neighbors.end(), vertex)) {
-            return ErrorCode::Loop;
-        }
-        
+
         // Все соседи должны быть валидными вершинами [0, n)
         for (Vertex neighbor : neighbors) {
             if (neighbor >= vertexes_cnt) {
@@ -352,10 +333,19 @@ PlainGraph::ErrorCode PlainGraph::validate() const {
         }
         
         // Проверка симметрии (неориентированность)
-        for (Vertex neighbour : neighbors) {
+        for (size_t i = 0; i < neighbors.size();) {
+            Vertex neighbour = neighbors[i];
             const auto& neighbour_neighbors = adj_[neighbour];
-            if (!std::binary_search(neighbour_neighbors.begin(), neighbour_neighbors.end(), vertex)) {
+
+            size_t cnt_forward = std::count(neighbors.begin(), neighbors.end(), neighbour);
+            size_t cnt_backward = std::count(neighbour_neighbors.begin(), neighbour_neighbors.end(), vertex);
+
+            if (cnt_forward != cnt_backward) {
                 return ErrorCode::Asymmetrical;
+            }
+
+            while (i < neighbors.size() && neighbors[i] == neighbour) {
+                ++i;
             }
         }
     }
@@ -400,7 +390,7 @@ void PlainGraph::dump(const char* filename) const noexcept try {
     out << "\nEDGES:\n";
     for (Vertex src = 0; src < nVertices(); ++src) {
         for (Vertex dst : adj_[src]) {
-            if (src < dst) {
+            if (src <= dst) {
                 out << "  " << src << ' ' << dst << '\n';
             }
         }
@@ -413,7 +403,7 @@ catch (...) {
 //--------------------------------------------------------------------------------------------------
 
 bool PlainGraph::isTree() const {
-    if (adj_.empty()) return false;
+    if (adj_.empty()) return true;
 
     std::vector<bool> visited(nVertices(), false);
 
@@ -425,6 +415,7 @@ bool PlainGraph::isTree() const {
 }
 
 bool PlainGraph::isForest() const {
+    if (adj_.empty()) return true;
 
     std::vector<bool> visited(nVertices(), false);
 
@@ -539,29 +530,22 @@ void PlainGraph::FindArticulationPointHelper(
 
     bool is_articulation_point = false;
 
-    for (size_t neighbour_ind = 0; neighbour_ind < adj_[vertex].size(); ++neighbour_ind) {
-        Vertex neighbour = adj_[vertex][neighbour_ind];
-        if (neighbour == parent) {
-            continue; // Обратное ребро
+    for (size_t i = 0; i < adj_[vertex].size(); ) {
+        Vertex neighbor = adj_[vertex][i];
+        
+        while (i < adj_[vertex].size() && adj_[vertex][i] == neighbor) {
+            ++i;
         }
+        
+        if (neighbor == parent) continue;
 
-        if (visited[neighbour]) {
-            fup[vertex] = std::min(fup[vertex], tin[neighbour]);
-        }
-        else {
-            FindArticulationPointHelper(
-                neighbour,
-                visited,
-                tin,
-                fup,
-                articulation_points,
-                timer,
-                vertex
-            );
-
-            fup[vertex] = std::min(fup[vertex], fup[neighbour]);
-
-            if (fup[neighbour] > tin[vertex] && parent != VERTEX_POISON) { // не корень
+        if (visited[neighbor]) {
+            fup[vertex] = std::min(fup[vertex], tin[neighbor]);
+        } else {
+            FindArticulationPointHelper(neighbor, visited, tin, fup, articulation_points, timer, vertex);
+            fup[vertex] = std::min(fup[vertex], fup[neighbor]);
+            
+            if (fup[neighbor] >= tin[vertex] && parent != VERTEX_POISON) {
                 is_articulation_point = true;
             }
             ++children;
@@ -587,32 +571,30 @@ void PlainGraph::FindBridgesHelper(
     visited[vertex] = true;
     tin[vertex] = fup[vertex] = timer++;
 
-    for (size_t neighbour_ind = 0; neighbour_ind < adj_[vertex].size(); ++neighbour_ind) {
-        Vertex neighbour = adj_[vertex][neighbour_ind];
-        if (neighbour == parent) {
-            continue; // Обратное ребро
+    for (size_t i = 0; i < adj_[vertex].size(); ) {
+        Vertex neighbor = adj_[vertex][i];
+        
+        size_t multiplicity = 0;
+        while (i < adj_[vertex].size() && adj_[vertex][i] == neighbor) {
+            ++multiplicity;
+            ++i;
         }
+        
+        if (neighbor == parent) continue;
 
-        if (visited[neighbour]) {
-            fup[vertex] = std::min(fup[vertex], tin[neighbour]);
-        }
-        else {
-            FindBridgesHelper(
-                neighbour,
-                visited,
-                tin,
-                fup,
-                bridges,
-                timer,
-                vertex
-            );
-
-            fup[vertex] = std::min(fup[vertex], fup[neighbour]);
-
-            if (fup[neighbour] > tin[vertex]) {
-                const Vertex src = std::min(vertex, neighbour);
-                const Vertex dst = std::max(vertex, neighbour);
-                bridges.push_back(Edge{src, dst});
+        if (visited[neighbor]) {
+            fup[vertex] = std::min(fup[vertex], tin[neighbor]);
+        } else {
+            FindBridgesHelper(neighbor, visited, tin, fup, bridges, timer, vertex);
+            fup[vertex] = std::min(fup[vertex], fup[neighbor]);
+            
+            // Ребро является мостом только
+            // 1. Оно единственное между vertex и neighbor (multiplicity == 1)
+            // 2. Нет обратного ребра из поддерева neighbor в vertex или выше
+            if (multiplicity == 1 && fup[neighbor] > tin[vertex]) {
+                Vertex src = std::min(vertex, neighbor);
+                Vertex dst = std::max(vertex, neighbor);
+                bridges.emplace_back(src, dst);
             }
         }
     }
@@ -627,6 +609,9 @@ bool PlainGraph::hasCycleHelper(
     visited[vertex] = true;
 
     for (auto neighbor : adj_[vertex]) {
+        if (neighbor == vertex) {
+            return true;
+        }
         if (!visited[neighbor]) {
             if (hasCycleHelper(neighbor, visited, vertex)) {
                 return true;
@@ -687,17 +672,10 @@ bool DirectionalGraph::addEdge(DirectionalGraph::Vertex src, DirectionalGraph::V
     if (dst >= adj_.size()) {
         return false;
     }
-    if (src == dst) {
-        return false;
-    }
     
     auto& src_neighbors = adj_[src];
 
     const auto dst_it = std::lower_bound(src_neighbors.begin(), src_neighbors.end(), dst);
-    
-    if (dst_it != src_neighbors.end() && *dst_it == dst) {
-        return false;
-    }
 
     src_neighbors.insert(dst_it, dst);
 
@@ -723,17 +701,6 @@ DirectionalGraph::ErrorCode DirectionalGraph::validate() const {
         // Список смежности должен быть отсортирован
         if (!std::is_sorted(neighbors.begin(), neighbors.end())) {
             return ErrorCode::NotSortedNeighbours;
-        }
-        
-        // Не должно быть дубликатов (кратные рёбра)
-        if (!neighbors.empty() && 
-            std::adjacent_find(neighbors.begin(), neighbors.end()) != neighbors.end()) {
-            return ErrorCode::MultiEdges;
-        }
-        
-        // Не должно быть петель
-        if (std::binary_search(neighbors.begin(), neighbors.end(), vertex)) {
-            return ErrorCode::Loop;
         }
         
         // Все соседи должны быть валидными вершинами [0, n)
@@ -789,6 +756,12 @@ catch (...) {
 //--------------------------------------------------------------------------------------------------
 
 bool DirectionalGraph::isDAG() const {
+    for (Vertex vertex = 0; vertex < nVertices(); ++vertex) {
+        if (std::binary_search(adj_[vertex].begin(), adj_[vertex].end(), vertex)) {
+            return false;
+        }
+    }
+
     std::vector<VertexColor> colors(nVertices(), VertexColor::White);
 
     for (Vertex vertex = 0; vertex < nVertices(); ++vertex) {
@@ -857,7 +830,7 @@ std::vector<DirectionalGraph::Vertex> DirectionalGraph::topological() const {
     for (Vertex vertex = 0; vertex < nVertices(); ++vertex) {
         if (colors[vertex] == VertexColor::White 
          && !topologicalHelper(vertex, colors, topological)) {
-            throw std::runtime_error("This graph not DAG and has cycle");
+            return {};
         }
     }
 
@@ -917,6 +890,10 @@ bool DirectionalGraph::hasCycleHelper(Vertex vertex, std::vector<VertexColor>& c
     colors[vertex] = VertexColor::Gray;
 
     for (Vertex neighbour: adj_[vertex]) {
+        if (neighbour == vertex) {
+            return true;
+        }
+        
         if (colors[neighbour] == VertexColor::White) {
             if (hasCycleHelper(neighbour, colors)) {
                 return true;
@@ -940,8 +917,12 @@ bool DirectionalGraph::topologicalHelper(
     colors[vertex] = VertexColor::Gray;
 
     for (Vertex neighbour: adj_[vertex]) {
+        if (neighbour == vertex) {
+            return false;
+        }
+
         if (colors[neighbour] == VertexColor::White) {
-            if (topologicalHelper(neighbour, colors, topological)) {
+            if (!topologicalHelper(neighbour, colors, topological)) {
                 return false;
             }
         }

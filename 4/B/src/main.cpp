@@ -185,6 +185,7 @@ private:
 
     struct Cache {
         bool is_tree = true;
+        bool is_forest = true;
         size_t n_components = 0;
         bool is_valid = false;
 
@@ -227,6 +228,8 @@ private:
         }
 
         cache_.is_tree = (cache_.n_components == 1) && !has_cycle && (nEdges() == n - 1);
+        cache_.is_forest = !has_cycle;
+        
         cache_.is_valid = true;
     }
 
@@ -479,19 +482,10 @@ bool PlainGraph::isTree() const {
 }
 
 bool PlainGraph::isForest() const {
-    if (adj_.empty()) return true;
-
-    std::vector<bool> visited(nVertices(), false);
-
-    for (Vertex vertex = 0; vertex < nVertices(); ++vertex) {
-        if (!visited[vertex]) {
-            if (hasCycleHelper(vertex, visited, VERTEX_POISON)) {
-                return false;
-            }
-        }
+    if (!cache_.is_valid) {
+        rebuildCache();
     }
-
-    return true;
+    return cache_.is_forest;
 }
 
 size_t PlainGraph::nJointComponents() const {

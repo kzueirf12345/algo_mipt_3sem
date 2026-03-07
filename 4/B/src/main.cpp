@@ -101,7 +101,7 @@ public:
 
 public:
     
-                    virtual Vertex              addVertex   ()                                              ;
+                    virtual Vertex              addVertex   ()                                          = 0 ;
                     virtual bool                addEdge     (Vertex src, Vertex dst)                    = 0 ;
     
     [[nodiscard]]   virtual size_t              nVertices   ()                          const noexcept      ;
@@ -138,7 +138,7 @@ public:
     using Component = uint64_t;
 
 public:
-
+                    virtual Vertex                  addVertex                   ()                                                          override    final   ;
                     virtual bool                    addEdge                     (Vertex src, Vertex dst)                                    override    final   ;
     [[nodiscard]]   virtual size_t                  nEdges                      ()                                      const   noexcept    override    final   ;
 
@@ -183,12 +183,79 @@ private:
                                                                                  int64_t& timer,
                                                                                  Vertex parent)                         const                                   ;
 
+    struct Cache {
+        bool is_tree = true;
+        size_t n_components = 0;
+        bool is_valid = false;
+
+        void reset(size_t n) {
+            is_tree = true;
+            n_components = 0;
+            is_valid = false;
+        }
+    } mutable cache_;
+
+    struct Utils {
+        std::vector<bool> visited;
+        
+        void reset(size_t n) {
+            (void)n;
+            visited.assign(n, false);
+        }
+    } mutable utils_;
+
+    void rebuildCache() const {
+        const size_t n = nVertices();
+
+        cache_.reset(n);
+
+        if (n == 0) {
+            cache_.is_valid = true;
+            return;
+        }
+
+        utils_.reset(n);
+        
+        bool has_cycle = false;
+        
+        for (Vertex v = 0; v < n; ++v) {
+            if (!utils_.visited[v]) {
+                dfsCombined(v, VERTEX_POISON, has_cycle);
+                ++cache_.n_components;
+            }
+
+        }
+
+        cache_.is_tree = (cache_.n_components == 1) && !has_cycle && (nEdges() == n - 1);
+        cache_.is_valid = true;
+    }
+
+    void dfsCombined(Vertex vertex, Vertex parent, bool& has_cycle) const {
+        utils_.visited[vertex] = true;
+        
+        for (size_t i = 0; i < adj_[vertex].size(); ) {
+            Vertex neighbor = adj_[vertex][i];
+            
+            if (neighbor == parent) {
+                continue;
+            }
+            
+            if (!utils_.visited[neighbor]) {
+                dfsCombined(neighbor, vertex, has_cycle);
+            }
+            else {
+                has_cycle = true;
+            }
+        }
+    }
+
 };
 
 class DirectionalGraph: public CommonGraph {
 
 public:
 
+                    virtual Vertex                                              addVertex   ()                                              override    final   ;
                     virtual bool                                                addEdge     (Vertex src, Vertex dst)                        override    final   ;
     [[nodiscard]]   virtual size_t                                              nEdges      ()                          const   noexcept    override    final   ;
 
@@ -241,18 +308,6 @@ private:
 // CommonGraph
 //==================================================================================================
 
-CommonGraph::Vertex CommonGraph::addVertex() {
-    adj_.push_back({});
-
-#ifndef NDEBUG
-    assert(validate() == ErrorCode::NoError);
-#endif
-
-    return adj_.size() - 1;
-}
-
-//--------------------------------------------------------------------------------------------------
-
 size_t CommonGraph::nVertices() const noexcept {
     return adj_.size();
 }
@@ -276,6 +331,18 @@ std::vector<CommonGraph::Vertex> CommonGraph::getAdjuscent(
 //==================================================================================================
 // PlainGraph
 //==================================================================================================
+
+PlainGraph::Vertex PlainGraph::addVertex() {
+    adj_.push_back({});
+
+#ifndef NDEBUG
+    assert(validate() == ErrorCode::NoError);
+#endif
+
+    cache_.is_valid = false;
+
+    return adj_.size() - 1;
+}
 
 bool PlainGraph::addEdge(PlainGraph::Vertex src, PlainGraph::Vertex dst) {
     if (src >= adj_.size()) {
@@ -306,6 +373,8 @@ bool PlainGraph::addEdge(PlainGraph::Vertex src, PlainGraph::Vertex dst) {
 #ifndef NDEBUG
     assert(validate() == ErrorCode::NoError);
 #endif
+
+    cache_.is_valid = false;
 
     return true;
 }
@@ -403,15 +472,10 @@ catch (...) {
 //--------------------------------------------------------------------------------------------------
 
 bool PlainGraph::isTree() const {
-    if (adj_.empty()) return true;
-
-    std::vector<bool> visited(nVertices(), false);
-
-    if (hasCycleHelper(0, visited, VERTEX_POISON)) {
-        return false;
+    if (!cache_.is_valid) {
+        rebuildCache();
     }
-
-    return std::all_of(visited.begin(), visited.end(), [](bool v) { return v; });
+    return cache_.is_tree;
 }
 
 bool PlainGraph::isForest() const {
@@ -664,6 +728,17 @@ static void condenseHelper(
 );
 
 //--------------------------------------------------------------------------------------------------
+
+DirectionalGraph::Vertex DirectionalGraph::addVertex() {
+    adj_.push_back({});
+
+#ifndef NDEBUG
+    assert(validate() == ErrorCode::NoError);
+#endif
+
+    return adj_.size() - 1;
+}
+
 
 bool DirectionalGraph::addEdge(DirectionalGraph::Vertex src, DirectionalGraph::Vertex dst) {
     if (src >= adj_.size()) {

@@ -181,6 +181,7 @@ private:
 
         void reset(size_t n) {
             is_tree = true;
+            is_forest = true;
             n_components = 0;
             is_valid = false;
             components.assign(n, VERTEX_POISON);
@@ -228,8 +229,16 @@ private:
         utils_.visited[vertex] = true;
         cache_.components[vertex] = cache_.n_components;
         
-        for (size_t i = 0; i < adj_[vertex].size(); ) {
+        const size_t neib_cnt = adj_[vertex].size();
+
+        for (size_t i = 0; i < neib_cnt; ++i) {
             Vertex neighbor = adj_[vertex][i];
+
+            // size_t multiplicity = 0;
+            // while (i < neib_cnt && adj_[vertex][i] == neighbor) {
+            //     ++multiplicity;
+            //     ++i;
+            // }
             
             if (neighbor == parent) {
                 continue;

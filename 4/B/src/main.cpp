@@ -150,18 +150,11 @@ public:
     [[nodiscard]]           bool                    isTree                      ()                                      const                                   ;
     [[nodiscard]]           bool                    isForest                    ()                                      const                                   ;
     [[nodiscard]]           size_t                  nJointComponents            ()                                      const                                   ;
-    [[nodiscard]]           std::vector<Component>  getJointComponents          ()                                      const                                   ; //vec[vertex] = id_comp 
+    [[nodiscard]]           std::vector<Component>  getJointComponents          ()                                      const                                   ;
     [[nodiscard]]           std::vector<Edge>       getBridges                  ()                                      const                                   ;
     [[nodiscard]]           std::vector<Vertex>     getArticulationPoints       ()                                      const                                   ;
 
 private:
-
-                            void                    markJointComponent          (Vertex vertex, 
-                                                                                 std::vector<bool>& visited)            const                                   ;
-
-                            void                    fillJointComponent          (Vertex vertex, 
-                                                                                 std::vector<Component>& components,
-                                                                                 PlainGraph::Component component)       const                                   ;
 
                             void                    FindBridgesHelper           (Vertex vertex, 
                                                                                  std::vector<bool>& visited, 
@@ -183,12 +176,14 @@ private:
         bool is_tree = true;
         bool is_forest = true;
         size_t n_components = 0;
+        std::vector<Component> components;
         bool is_valid = false;
 
         void reset(size_t n) {
             is_tree = true;
             n_components = 0;
             is_valid = false;
+            components.assign(n, VERTEX_POISON);
         }
     } mutable cache_;
 
@@ -231,6 +226,7 @@ private:
 
     void dfsCombined(Vertex vertex, Vertex parent, bool& has_cycle) const {
         utils_.visited[vertex] = true;
+        cache_.components[vertex] = cache_.n_components;
         
         for (size_t i = 0; i < adj_[vertex].size(); ) {
             Vertex neighbor = adj_[vertex][i];
@@ -492,19 +488,10 @@ size_t PlainGraph::nJointComponents() const {
 }
 
 std::vector<PlainGraph::Component> PlainGraph::getJointComponents() const {
-
-    std::vector<PlainGraph::Component> components(nVertices(), VERTEX_POISON);
-
-    PlainGraph::Component component = 0;
-
-    for (Vertex vertex = 0; vertex < nVertices(); ++vertex) {
-        if (components[vertex] == VERTEX_POISON) {
-            fillJointComponent(vertex, components, component);
-            ++component;
-        }
+    if (!cache_.is_valid) {
+        rebuildCache();
     }
-
-    return components;
+    return cache_.components;
 }
 
 std::vector<PlainGraph::Edge> PlainGraph::getBridges() const {
@@ -643,33 +630,6 @@ void PlainGraph::FindBridgesHelper(
             }
         }
     }
-}
-
-void PlainGraph::markJointComponent(PlainGraph::Vertex vertex, std::vector<bool>& visited) const {
-
-    visited[vertex] = true;
-
-    for (auto neighbor : adj_[vertex]) {
-        if (!visited[neighbor]) {
-            markJointComponent(neighbor, visited);
-        }
-    }
-}
-
-void PlainGraph::fillJointComponent(
-    PlainGraph::Vertex vertex, 
-    std::vector<PlainGraph::Component>& components,
-    PlainGraph::Component component
-) const {
-
-    components[vertex] = component;
-
-    for (auto neighbor : adj_[vertex]) {
-        if (components[neighbor] == VERTEX_POISON) {
-            fillJointComponent(neighbor, components, component);
-        }
-    }
-
 }
 
 //==================================================================================================

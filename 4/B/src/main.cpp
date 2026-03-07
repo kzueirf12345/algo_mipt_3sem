@@ -156,10 +156,6 @@ public:
 
 private:
 
-                            bool                    hasCycleHelper              (Vertex vertex, 
-                                                                                 std::vector<bool>& visited, 
-                                                                                 Vertex parent)                         const                                   ;
-
                             void                    markJointComponent          (Vertex vertex, 
                                                                                  std::vector<bool>& visited)            const                                   ;
 
@@ -229,7 +225,7 @@ private:
 
         cache_.is_tree = (cache_.n_components == 1) && !has_cycle && (nEdges() == n - 1);
         cache_.is_forest = !has_cycle;
-        
+
         cache_.is_valid = true;
     }
 
@@ -489,19 +485,10 @@ bool PlainGraph::isForest() const {
 }
 
 size_t PlainGraph::nJointComponents() const {
-
-    std::vector<bool> visited(nVertices(), false);
-
-    size_t nJointComponents = 0;
-
-    for (Vertex vertex = 0; vertex < nVertices(); ++vertex) {
-        if (!visited[vertex]) {
-            markJointComponent(vertex, visited);
-            ++nJointComponents;
-        }
+    if (!cache_.is_valid) {
+        rebuildCache();
     }
-
-    return nJointComponents;
+    return cache_.n_components;
 }
 
 std::vector<PlainGraph::Component> PlainGraph::getJointComponents() const {
@@ -656,31 +643,6 @@ void PlainGraph::FindBridgesHelper(
             }
         }
     }
-}
-
-bool PlainGraph::hasCycleHelper(
-    PlainGraph::Vertex vertex, 
-    std::vector<bool>& visited, 
-    PlainGraph::Vertex parent
-) const {
-
-    visited[vertex] = true;
-
-    for (auto neighbor : adj_[vertex]) {
-        if (neighbor == vertex) {
-            return true;
-        }
-        if (!visited[neighbor]) {
-            if (hasCycleHelper(neighbor, visited, vertex)) {
-                return true;
-            }
-        }
-        else if (neighbor != parent) {
-            return true;
-        }
-    }
-
-    return false;
 }
 
 void PlainGraph::markJointComponent(PlainGraph::Vertex vertex, std::vector<bool>& visited) const {

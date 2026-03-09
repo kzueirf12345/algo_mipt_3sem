@@ -184,28 +184,13 @@ public:
 
 private:
 
-                            void                    FindBridgesHelper           (Vertex vertex, 
-                                                                                 std::vector<bool>& visited, 
-                                                                                 std::vector<int64_t>& tin,
-                                                                                 std::vector<int64_t>& fup,
-                                                                                 std::vector<Edge>& bridges,
-                                                                                 int64_t& timer,
-                                                                                 Vertex parent)                         const                                   ;
-
-                            void                    FindArticulationPointHelper (Vertex vertex, 
-                                                                                 std::vector<bool>& visited, 
-                                                                                 std::vector<int64_t>& tin,
-                                                                                 std::vector<int64_t>& fup,
-                                                                                 std::vector<Vertex>& articulation_points,
-                                                                                 int64_t& timer,
-                                                                                 Vertex parent)                         const                                   ;
-
     struct Cache {
         bool is_tree = true;
         bool is_forest = true;
         size_t n_components = 0;
         std::vector<Component> components;
         std::vector<Edge> bridges;
+        std::vector<Vertex> articulation_points;
         bool is_valid = false;
 
         void reset(size_t n) {
@@ -214,6 +199,7 @@ private:
             n_components = 0;
             components.assign(n, VERTEX_POISON);
             bridges.clear();
+            articulation_points.clear();
             is_valid = false;
         }
     } mutable cache_;
@@ -263,6 +249,9 @@ private:
     void dfsCombined(Vertex vertex, Vertex parent) const {
         cache_.components[vertex] = cache_.n_components;
         utils_.tin[vertex] = utils_.fup[vertex] = utils_.timer++;
+
+        int64_t children = 0;
+        bool is_articulation_point = false;
         
         const size_t neib_cnt = adj_cnt_[vertex].size();
 
@@ -276,6 +265,7 @@ private:
             
             if (utils_.tin[neighbor] == -1) {
                 dfsCombined(neighbor, vertex);
+                ++children;
 
                 if (cnt > 1) {
                     utils_.has_cycle = true;
@@ -287,11 +277,23 @@ private:
                     Vertex dst = std::max(vertex, neighbor);
                     cache_.bridges.emplace_back(src, dst);
                 }
+
+                if (utils_.fup[neighbor] >= utils_.tin[vertex] && parent != VERTEX_POISON) {
+                    is_articulation_point = true;
+                }
             }
             else {
                 utils_.has_cycle = true;
                 utils_.fup[vertex] = std::min(utils_.fup[vertex], utils_.tin[neighbor]);
             }
+        }
+
+        if (parent == VERTEX_POISON && children > 1) {
+            is_articulation_point = true;
+        }
+
+        if (is_articulation_point) {
+            cache_.articulation_points.push_back(vertex);
         }
     }
 
@@ -594,117 +596,12 @@ std::vector<PlainGraph::Edge> PlainGraph::getBridges() const {
 }
 
 std::vector<PlainGraph::Vertex> PlainGraph::getArticulationPoints() const {
-    std::vector<bool> visited(nVertices(), false);
-    std::vector<int64_t> tin(nVertices(), -1);
-    std::vector<int64_t> fup(nVertices(), -1);
-    int64_t timer = 0;
-
-    std::vector<Vertex> articulation_points;
-
-    for (Vertex vertex = 0; vertex < nVertices(); ++vertex) {
-        if (!visited[vertex]) {
-            FindArticulationPointHelper(
-                vertex, 
-                visited,
-                tin,
-                fup,
-                articulation_points,
-                timer,
-                VERTEX_POISON
-            );
-        }
+    if (!cache_.is_valid) {
+        rebuildCache();
     }
-
-    return articulation_points;
+    return cache_.articulation_points;
 }
 
-//--------------------------------------------------------------------------------------------------
-
-void PlainGraph::FindArticulationPointHelper(
-    Vertex vertex, 
-    std::vector<bool>& visited, 
-    std::vector<int64_t>& tin,
-    std::vector<int64_t>& fup,
-    std::vector<Vertex>& articulation_points,
-    int64_t& timer,
-    Vertex parent
-) const {
-    visited[vertex] = true;
-    tin[vertex] = fup[vertex] = timer++;
-
-    int64_t children = 0;
-
-    bool is_articulation_point = false;
-
-    for (size_t i = 0; i < adj_[vertex].size(); ) {
-        Vertex neighbor = adj_[vertex][i];
-        
-        while (i < adj_[vertex].size() && adj_[vertex][i] == neighbor) {
-            ++i;
-        }
-        
-        if (neighbor == parent) continue;
-
-        if (visited[neighbor]) {
-            fup[vertex] = std::min(fup[vertex], tin[neighbor]);
-        } else {
-            FindArticulationPointHelper(neighbor, visited, tin, fup, articulation_points, timer, vertex);
-            fup[vertex] = std::min(fup[vertex], fup[neighbor]);
-            
-            if (fup[neighbor] >= tin[vertex] && parent != VERTEX_POISON) {
-                is_articulation_point = true;
-            }
-            ++children;
-        }
-    }
-
-    if (is_articulation_point 
-     || (parent == VERTEX_POISON && children > 1) // корень
-    ) {
-        articulation_points.push_back(vertex);
-    }
-}
-
-void PlainGraph::FindBridgesHelper(
-    Vertex vertex, 
-    std::vector<bool>& visited, 
-    std::vector<int64_t>& tin,
-    std::vector<int64_t>& fup,
-    std::vector<Edge>& bridges,
-    int64_t& timer,
-    Vertex parent
-) const {
-    visited[vertex] = true;
-    tin[vertex] = fup[vertex] = timer++;
-
-    for (size_t i = 0; i < adj_[vertex].size(); ) {
-        Vertex neighbor = adj_[vertex][i];
-        
-        size_t multiplicity = 0;
-        while (i < adj_[vertex].size() && adj_[vertex][i] == neighbor) {
-            ++multiplicity;
-            ++i;
-        }
-        
-        if (neighbor == parent) continue;
-
-        if (visited[neighbor]) {
-            fup[vertex] = std::min(fup[vertex], tin[neighbor]);
-        } else {
-            FindBridgesHelper(neighbor, visited, tin, fup, bridges, timer, vertex);
-            fup[vertex] = std::min(fup[vertex], fup[neighbor]);
-            
-            // Ребро является мостом только
-            // 1. Оно единственное между vertex и neighbor (multiplicity == 1)
-            // 2. Нет обратного ребра из поддерева neighbor в vertex или выше
-            if (multiplicity == 1 && fup[neighbor] > tin[vertex]) {
-                Vertex src = std::min(vertex, neighbor);
-                Vertex dst = std::max(vertex, neighbor);
-                bridges.emplace_back(src, dst);
-            }
-        }
-    }
-}
 
 //==================================================================================================
 // DirectionalGraph

@@ -219,7 +219,6 @@ private:
     } mutable cache_;
 
     struct Utils {
-        std::vector<bool> visited;
         std::vector<int64_t> tin;
         std::vector<int64_t> fup;
         int64_t timer = 0;
@@ -227,7 +226,6 @@ private:
         
         void reset(size_t n) {
             (void)n;
-            visited.assign(n, false);
             tin.assign(n, -1);
             fup.assign(n, -1);
             timer = 0;
@@ -263,7 +261,6 @@ private:
     }
 
     void dfsCombined(Vertex vertex, Vertex parent) const {
-        utils_.visited[vertex] = true;
         cache_.components[vertex] = cache_.n_components;
         utils_.tin[vertex] = utils_.fup[vertex] = utils_.timer++;
         
@@ -276,16 +273,24 @@ private:
             if (neighbor == parent) {
                 continue;
             }
-
-            if (cnt > 1) {
-                utils_.has_cycle = true;
-            }
             
             if (utils_.tin[neighbor] == -1) {
                 dfsCombined(neighbor, vertex);
+
+                if (cnt > 1) {
+                    utils_.has_cycle = true;
+                }
+
+                utils_.fup[vertex] = std::min(utils_.fup[vertex], utils_.fup[neighbor]);
+                if (cnt == 1 && utils_.fup[neighbor] > utils_.tin[vertex]) {
+                    Vertex src = std::min(vertex, neighbor);
+                    Vertex dst = std::max(vertex, neighbor);
+                    cache_.bridges.emplace_back(src, dst);
+                }
             }
             else {
                 utils_.has_cycle = true;
+                utils_.fup[vertex] = std::min(utils_.fup[vertex], utils_.tin[neighbor]);
             }
         }
     }
@@ -582,28 +587,10 @@ std::vector<PlainGraph::Component> PlainGraph::getJointComponents() const {
 }
 
 std::vector<PlainGraph::Edge> PlainGraph::getBridges() const {
-    std::vector<bool> visited(nVertices(), false);
-    std::vector<int64_t> tin(nVertices(), -1);
-    std::vector<int64_t> fup(nVertices(), -1);
-    int64_t timer = 0;
-
-    std::vector<Edge> bridges;
-
-    for (Vertex vertex = 0; vertex < nVertices(); ++vertex) {
-        if (!visited[vertex]) {
-            FindBridgesHelper(
-                vertex, 
-                visited,
-                tin,
-                fup,
-                bridges,
-                timer,
-                VERTEX_POISON
-            );
-        }
+    if (!cache_.is_valid) {
+        rebuildCache();
     }
-
-    return bridges;
+    return cache_.bridges;
 }
 
 std::vector<PlainGraph::Vertex> PlainGraph::getArticulationPoints() const {

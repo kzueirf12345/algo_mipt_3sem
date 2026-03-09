@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <limits>
+#include <utility>
 #include <vector>
 #include <cassert>
 #include <fstream>
@@ -100,6 +101,10 @@ public:
     auto operator<=>(const CommonGraph& other) const = default; 
 
 public:
+
+    virtual ~CommonGraph() = default; 
+
+public:
     
                     virtual Vertex              addVertex   ()                                          = 0 ;
                     virtual bool                addEdge     (Vertex src, Vertex dst)                    = 0 ;
@@ -125,7 +130,30 @@ public:
 
 protected:
 
+    using VertexCnt = uint64_t;
+
+    static VertexCnt MakeVertexCnt(Vertex v, uint64_t cnt) {
+        return (cnt << 32) | v;
+    }
+
+    static Vertex GetVertex(VertexCnt vertex_cnt) {
+        return vertex_cnt & 0xFFFFFFFF;
+    }
+
+    static uint64_t GetCnt(VertexCnt vertex_cnt) {
+        return (vertex_cnt >> 32) & 0xFFFFFFFF;
+    }
+
+    static void SetVertex(VertexCnt& vertex_cnt, Vertex vertex) {
+        vertex_cnt = (vertex_cnt & 0xFFFFFFFF00000000) | vertex;
+    }
+
+    static void SetCnt(VertexCnt& vertex_cnt, uint64_t cnt) {
+        vertex_cnt = (vertex_cnt & 0xFFFFFFFF) | (cnt << 32);
+    }
+
     std::vector<std::vector<Vertex>> adj_;
+    std::vector<std::vector<VertexCnt>> adj_cnt_;
     size_t edges_cnt_ = 0;
 
 };
@@ -177,23 +205,33 @@ private:
         bool is_forest = true;
         size_t n_components = 0;
         std::vector<Component> components;
+        std::vector<Edge> bridges;
         bool is_valid = false;
 
         void reset(size_t n) {
             is_tree = true;
             is_forest = true;
             n_components = 0;
-            is_valid = false;
             components.assign(n, VERTEX_POISON);
+            bridges.clear();
+            is_valid = false;
         }
     } mutable cache_;
 
     struct Utils {
         std::vector<bool> visited;
+        std::vector<int64_t> tin;
+        std::vector<int64_t> fup;
+        int64_t timer = 0;
+        bool has_cycle = false;
         
         void reset(size_t n) {
             (void)n;
             visited.assign(n, false);
+            tin.assign(n, -1);
+            fup.assign(n, -1);
+            timer = 0;
+            has_cycle = false;
         }
     } mutable utils_;
 
@@ -209,46 +247,45 @@ private:
 
         utils_.reset(n);
         
-        bool has_cycle = false;
         
         for (Vertex v = 0; v < n; ++v) {
-            if (!utils_.visited[v]) {
-                dfsCombined(v, VERTEX_POISON, has_cycle);
+            if (utils_.tin[v] == -1) {
+                dfsCombined(v, VERTEX_POISON);
                 ++cache_.n_components;
             }
 
         }
 
-        cache_.is_tree = (cache_.n_components == 1) && !has_cycle && (nEdges() == n - 1);
-        cache_.is_forest = !has_cycle;
+        cache_.is_tree = (cache_.n_components == 1) && !utils_.has_cycle && (nEdges() == n - 1);
+        cache_.is_forest = !utils_.has_cycle;
 
         cache_.is_valid = true;
     }
 
-    void dfsCombined(Vertex vertex, Vertex parent, bool& has_cycle) const {
+    void dfsCombined(Vertex vertex, Vertex parent) const {
         utils_.visited[vertex] = true;
         cache_.components[vertex] = cache_.n_components;
+        utils_.tin[vertex] = utils_.fup[vertex] = utils_.timer++;
         
-        const size_t neib_cnt = adj_[vertex].size();
+        const size_t neib_cnt = adj_cnt_[vertex].size();
 
         for (size_t i = 0; i < neib_cnt; ++i) {
-            Vertex neighbor = adj_[vertex][i];
-
-            // size_t multiplicity = 0;
-            // while (i < neib_cnt && adj_[vertex][i] == neighbor) {
-            //     ++multiplicity;
-            //     ++i;
-            // }
+            const Vertex neighbor = GetVertex(adj_cnt_[vertex][i]);
+            const Vertex cnt = GetCnt(adj_cnt_[vertex][i]);
             
             if (neighbor == parent) {
                 continue;
             }
+
+            if (cnt > 1) {
+                utils_.has_cycle = true;
+            }
             
-            if (!utils_.visited[neighbor]) {
-                dfsCombined(neighbor, vertex, has_cycle);
+            if (utils_.tin[neighbor] == -1) {
+                dfsCombined(neighbor, vertex);
             }
             else {
-                has_cycle = true;
+                utils_.has_cycle = true;
             }
         }
     }
@@ -338,6 +375,7 @@ std::vector<CommonGraph::Vertex> CommonGraph::getAdjuscent(
 
 PlainGraph::Vertex PlainGraph::addVertex() {
     adj_.push_back({});
+    adj_cnt_.push_back({});
 
 #ifndef NDEBUG
     assert(validate() == ErrorCode::NoError);
@@ -360,6 +398,26 @@ bool PlainGraph::addEdge(PlainGraph::Vertex src, PlainGraph::Vertex dst) {
         auto& src_neighbors = adj_[src];
     
         const auto dst_it = std::lower_bound(src_neighbors.begin(), src_neighbors.end(), dst);
+
+        auto& src_neighbors_cnt = adj_cnt_[src];
+
+        const auto dst_it_cnt = std::lower_bound(
+            src_neighbors_cnt.begin(), 
+            src_neighbors_cnt.end(), 
+            dst,  
+            [](const auto& first, const auto& second){
+                return GetVertex(first) < GetVertex(second);
+            }
+        );
+
+        
+        if (dst_it_cnt != src_neighbors_cnt.end() && GetVertex(*dst_it_cnt) == dst) {
+            const size_t dst_cnt_ind = dst_it_cnt - src_neighbors_cnt.begin();
+            SetCnt(src_neighbors_cnt[dst_cnt_ind], GetCnt(*dst_it_cnt) + 1);
+        }
+        else {
+            src_neighbors_cnt.insert(dst_it_cnt, MakeVertexCnt(dst, 1));
+        }
     
         src_neighbors.insert(dst_it, dst);
     } 
@@ -368,6 +426,26 @@ bool PlainGraph::addEdge(PlainGraph::Vertex src, PlainGraph::Vertex dst) {
         auto& dst_neighbors = adj_[dst];
     
         const auto src_it = std::lower_bound(dst_neighbors.begin(), dst_neighbors.end(), src);
+
+        auto& dst_neighbors_cnt = adj_cnt_[dst];
+
+        const auto src_it_cnt = std::lower_bound(
+            dst_neighbors_cnt.begin(), 
+            dst_neighbors_cnt.end(), 
+            src,  
+            [](const auto& first, const auto& second){
+                return GetVertex(first) < GetVertex(second);
+            }
+        );
+
+        
+        if (src_it_cnt != dst_neighbors_cnt.end() && GetVertex(*src_it_cnt) == src) {
+            const size_t src_cnt_ind = src_it_cnt - dst_neighbors_cnt.begin();
+            SetCnt(dst_neighbors_cnt[src_cnt_ind], GetCnt(*src_it_cnt) + 1);
+        }
+        else {
+            dst_neighbors_cnt.insert(src_it_cnt, MakeVertexCnt(src, 1));
+        }
     
         dst_neighbors.insert(src_it, src);
     }

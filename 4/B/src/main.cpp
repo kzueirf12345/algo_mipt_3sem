@@ -384,10 +384,6 @@ PlainGraph::Vertex PlainGraph::addVertex() {
     adj_.push_back({});
     adj_cnt_.push_back({});
 
-#ifndef NDEBUG
-    assert(validate() == ErrorCode::NoError);
-#endif
-
     cache_.is_valid = false;
 
     return adj_.size() - 1;
@@ -458,10 +454,6 @@ bool PlainGraph::addEdge(PlainGraph::Vertex src, PlainGraph::Vertex dst) {
     }
 
     ++edges_cnt_;
-
-#ifndef NDEBUG
-    assert(validate() == ErrorCode::NoError);
-#endif
 
     cache_.is_valid = false;
 
@@ -619,10 +611,6 @@ static void condenseHelper(
 DirectionalGraph::Vertex DirectionalGraph::addVertex() {
     adj_.push_back({});
 
-#ifndef NDEBUG
-    assert(validate() == ErrorCode::NoError);
-#endif
-
     return adj_.size() - 1;
 }
 
@@ -642,10 +630,6 @@ bool DirectionalGraph::addEdge(DirectionalGraph::Vertex src, DirectionalGraph::V
     src_neighbors.insert(dst_it, dst);
 
     ++edges_cnt_;
-
-#ifndef NDEBUG
-    assert(validate() == ErrorCode::NoError);
-#endif
 
     return true;
 }

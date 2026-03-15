@@ -1,13 +1,3 @@
-/*!SECTION
-В этой задаче вам предлагается разработать свою мини библиотеку для работы с невзвешенными графами. 
-Реализуйте структуры данных PlainGraph и DiectionalGraph и методы работы 
-с ними.
-
-Ваши типы (или type-alias) должны удовлетворять соответсвующем концептам. 
-Сами концепты добавлять в код не надо, они буду присоеденены автоматически.
-
-*/
-
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -112,7 +102,7 @@ public:
     [[nodiscard]]   virtual size_t              nVertices   ()                          const noexcept      ;
     [[nodiscard]]   virtual size_t              nEdges      ()                          const           = 0 ;
     [[nodiscard]]   virtual bool                has         (Edge edge)                 const               ;
-    [[nodiscard]]   virtual std::vector<Vertex> getAdjuscent(Vertex vertex)             const noexcept      ;
+    [[nodiscard]]   virtual const std::vector<Vertex>& getAdjuscent(Vertex vertex)             const noexcept      ;
 
 public:
 
@@ -178,9 +168,9 @@ public:
     [[nodiscard]]           bool                    isTree                      ()                                      const                                   ;
     [[nodiscard]]           bool                    isForest                    ()                                      const                                   ;
     [[nodiscard]]           size_t                  nJointComponents            ()                                      const                                   ;
-    [[nodiscard]]           std::vector<Component>  getJointComponents          ()                                      const                                   ;
-    [[nodiscard]]           std::vector<Edge>       getBridges                  ()                                      const                                   ;
-    [[nodiscard]]           std::vector<Vertex>     getArticulationPoints       ()                                      const                                   ;
+    [[nodiscard]]           const std::vector<Component>&  getJointComponents          ()                                      const                                   ;
+    [[nodiscard]]           const std::vector<Edge>&       getBridges                  ()                                      const                                   ;
+    [[nodiscard]]           const std::vector<Vertex>&     getArticulationPoints       ()                                      const                                   ;
 
 private:
 
@@ -367,12 +357,9 @@ bool CommonGraph::has(CommonGraph::Edge edge) const {
     return std::binary_search(adj_[edge.src].begin(), adj_[edge.src].end(), edge.dst);
 }
 
-std::vector<CommonGraph::Vertex> CommonGraph::getAdjuscent(
+const std::vector<CommonGraph::Vertex>& CommonGraph::getAdjuscent(
     CommonGraph::Vertex vertex
 ) const noexcept {
-    if (vertex >= adj_.size()) {
-        return {};
-    }
     return adj_[vertex];
 }
 
@@ -573,21 +560,21 @@ size_t PlainGraph::nJointComponents() const {
     return cache_.n_components;
 }
 
-std::vector<PlainGraph::Component> PlainGraph::getJointComponents() const {
+const std::vector<PlainGraph::Component>& PlainGraph::getJointComponents() const {
     if (!cache_.is_valid) {
         rebuildCache();
     }
     return cache_.components;
 }
 
-std::vector<PlainGraph::Edge> PlainGraph::getBridges() const {
+const std::vector<PlainGraph::Edge>& PlainGraph::getBridges() const {
     if (!cache_.is_valid) {
         rebuildCache();
     }
     return cache_.bridges;
 }
 
-std::vector<PlainGraph::Vertex> PlainGraph::getArticulationPoints() const {
+const std::vector<PlainGraph::Vertex>& PlainGraph::getArticulationPoints() const {
     if (!cache_.is_valid) {
         rebuildCache();
     }

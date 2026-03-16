@@ -73,7 +73,7 @@ public:
 
     using Vertex = uint64_t;
 
-    inline static constexpr Vertex VERTEX_POISON = std::numeric_limits<Vertex>::max();
+    inline static constexpr Vertex VERTEX_POISON = std::numeric_limits<uint32_t>::max();
     
     struct Edge {
 
@@ -120,30 +120,7 @@ public:
 
 protected:
 
-    using VertexCnt = uint64_t;
-
-    static VertexCnt MakeVertexCnt(Vertex v, uint64_t cnt) {
-        return (cnt << 32) | v;
-    }
-
-    static Vertex GetVertex(VertexCnt vertex_cnt) {
-        return vertex_cnt & 0xFFFFFFFF;
-    }
-
-    static uint64_t GetCnt(VertexCnt vertex_cnt) {
-        return (vertex_cnt >> 32) & 0xFFFFFFFF;
-    }
-
-    static void SetVertex(VertexCnt& vertex_cnt, Vertex vertex) {
-        vertex_cnt = (vertex_cnt & 0xFFFFFFFF00000000) | vertex;
-    }
-
-    static void SetCnt(VertexCnt& vertex_cnt, uint64_t cnt) {
-        vertex_cnt = (vertex_cnt & 0xFFFFFFFF) | (cnt << 32);
-    }
-
-    std::vector<std::vector<Vertex>> adj_;
-    std::vector<std::vector<VertexCnt>> adj_cnt_;
+    mutable std::vector<std::vector<Vertex>> adj_;
     size_t edges_cnt_ = 0;
 
 };
@@ -174,6 +151,16 @@ public:
 
 private:
 
+    bool isMultiEdge(Vertex u, Vertex v) const noexcept {
+        const auto& adj_u = adj_[u];
+        auto it = std::lower_bound(adj_u.begin(), adj_u.end(), v);
+        if (it == adj_u.end() || *it != v) return false;
+        
+        return (it + 1 != adj_u.end() && *(it + 1) == v);
+    }
+
+    mutable bool is_sorted_ = false;
+
     struct Cache {
         bool is_tree = true;
         bool is_forest = true;
@@ -201,15 +188,14 @@ private:
         bool has_cycle = false;
 
         struct StackFrame {
-            Vertex vertex;
-            Vertex parent;
+            uint32_t vertex;
+            uint32_t parent;
             size_t next_ind;
-            uint32_t edge_cnt_from_parent;
+            bool is_multi_edge;
             int32_t children;
             bool is_articulation;
             bool entered;
         };
-        
 
         std::vector<StackFrame> stack;
 
@@ -235,6 +221,13 @@ private:
         }
 
         utils_.reset(n);
+
+        if (!is_sorted_) {
+            for (std::vector<Vertex>& neibs: adj_) {
+                std::sort(neibs.begin(), neibs.end());
+            }
+            is_sorted_ = true;
+        }
         
         
         for (Vertex v = 0; v < n; ++v) {
@@ -252,17 +245,8 @@ private:
     }
 
     void dfsCombined(Vertex start, Vertex parent) const {
-        struct StackFrame {
-            Vertex vertex;
-            Vertex parent;
-            size_t next_ind;
-            uint64_t edge_cnt_from_parent;
-            int64_t children;
-            bool is_articulation;
-            bool entered;
-        };
         
-        utils_.stack.emplace_back(start, parent, 0, 1, 0, false, false);
+        utils_.stack.emplace_back(start, parent, 0, isMultiEdge(start, parent), 0, false, false);
         
         while (!utils_.stack.empty()) {
             Utils::StackFrame& frame = utils_.stack.back();
@@ -274,21 +258,22 @@ private:
                 frame.entered = true;
             }
             
-            const auto& neighbors = adj_cnt_[v];
+            const auto& neighbors = adj_[v];
             const size_t neib_cnt = neighbors.size();
             
             bool pushed_child = false;
             while (frame.next_ind < neib_cnt) {
-                const Vertex neighbor = GetVertex(neighbors[frame.next_ind]);
-                const uint64_t edge_cnt = GetCnt(neighbors[frame.next_ind]);
-                ++frame.next_ind;
+                const Vertex neighbor = neighbors[frame.next_ind];
+                do {
+                    ++frame.next_ind;
+                } while (frame.next_ind < neib_cnt && neighbors[frame.next_ind] == neighbor);
                 
                 if (neighbor == frame.parent) {
                     continue;
                 }
                 
                 if (utils_.tin[neighbor] == -1) {
-                    utils_.stack.emplace_back(neighbor, v, 0, edge_cnt, 0, false, false);
+                    utils_.stack.emplace_back(neighbor, v, 0, isMultiEdge(v, neighbor), 0, false, false);
                     pushed_child = true;
                     break;
                 }
@@ -307,18 +292,16 @@ private:
             if (!utils_.stack.empty()) {
                 Utils::StackFrame& parent_frame = utils_.stack.back();
                 Vertex p = parent_frame.vertex;
-                const uint64_t edge_cnt = frame.edge_cnt_from_parent;
+                const bool is_multi_edge = frame.is_multi_edge;
                 
-                if (edge_cnt > 1) {
+                if (is_multi_edge) {
                     utils_.has_cycle = true;
                 }
                 
                 utils_.fup[p] = std::min(utils_.fup[p], utils_.fup[v]);
                 
-                if (edge_cnt == 1 && utils_.fup[v] > utils_.tin[p]) {
-                    Vertex src = std::min(p, v);
-                    Vertex dst = std::max(p, v);
-                    cache_.bridges.emplace_back(src, dst);
+                if (!is_multi_edge && utils_.fup[v] > utils_.tin[p]) {
+                    cache_.bridges.emplace_back(v, p);
                 }
                 
                 if (utils_.fup[v] >= utils_.tin[p] && parent_frame.parent != VERTEX_POISON) {
@@ -422,7 +405,6 @@ const std::vector<CommonGraph::Vertex>& CommonGraph::getAdjuscent(
 
 PlainGraph::Vertex PlainGraph::addVertex() {
     adj_.push_back({});
-    adj_cnt_.push_back({});
 
     cache_.is_valid = false;
 
@@ -438,36 +420,13 @@ bool PlainGraph::addEdge(PlainGraph::Vertex src, PlainGraph::Vertex dst) {
     }
 
     adj_[src].push_back(dst);
-    
-    bool found = false;
-    for (auto& entry : adj_cnt_[src]) {
-        if (GetVertex(entry) == dst) {
-            SetCnt(entry, GetCnt(entry) + 1);
-            found = true;
-            break;
-        }
-    }
-    if (!found) {
-        adj_cnt_[src].push_back(MakeVertexCnt(dst, 1));
-    }
 
     adj_[dst].push_back(src);
-    
-    found = false;
-    for (auto& entry : adj_cnt_[dst]) {
-        if (GetVertex(entry) == src) {
-            SetCnt(entry, GetCnt(entry) + 1);
-            found = true;
-            break;
-        }
-    }
-    if (!found) {
-        adj_cnt_[dst].push_back(MakeVertexCnt(src, 1));
-    }
     
     ++edges_cnt_;
 
     cache_.is_valid = false;
+    is_sorted_ = false;
 
     return true;
 }

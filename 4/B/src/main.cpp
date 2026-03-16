@@ -165,9 +165,9 @@ public:
 
 public:
 
-    [[nodiscard]]           bool                    isTree                      ()                                      const                                   ;
-    [[nodiscard]]           bool                    isForest                    ()                                      const                                   ;
-    [[nodiscard]]           size_t                  nJointComponents            ()                                      const                                   ;
+    [[nodiscard]]           bool                           isTree                      ()                                      const                                   ;
+    [[nodiscard]]           bool                           isForest                    ()                                      const                                   ;
+    [[nodiscard]]           size_t                         nJointComponents            ()                                      const                                   ;
     [[nodiscard]]           const std::vector<Component>&  getJointComponents          ()                                      const                                   ;
     [[nodiscard]]           const std::vector<Edge>&       getBridges                  ()                                      const                                   ;
     [[nodiscard]]           const std::vector<Vertex>&     getArticulationPoints       ()                                      const                                   ;
@@ -199,11 +199,26 @@ private:
         std::vector<int64_t> fup;
         int64_t timer = 0;
         bool has_cycle = false;
+
+        struct StackFrame {
+            Vertex vertex;
+            Vertex parent;
+            size_t next_ind;
+            uint32_t edge_cnt_from_parent;
+            int32_t children;
+            bool is_articulation;
+            bool entered;
+        };
         
+
+        std::vector<StackFrame> stack;
+
         void reset(size_t n) {
             (void)n;
             tin.assign(n, -1);
             fup.assign(n, -1);
+            stack.clear();
+            stack.reserve(n);
             timer = 0;
             has_cycle = false;
         }
@@ -236,54 +251,91 @@ private:
         cache_.is_valid = true;
     }
 
-    void dfsCombined(Vertex vertex, Vertex parent) const {
-        cache_.components[vertex] = cache_.n_components;
-        utils_.tin[vertex] = utils_.fup[vertex] = utils_.timer++;
-
-        int64_t children = 0;
-        bool is_articulation_point = false;
+    void dfsCombined(Vertex start, Vertex parent) const {
+        struct StackFrame {
+            Vertex vertex;
+            Vertex parent;
+            size_t next_ind;
+            uint64_t edge_cnt_from_parent;
+            int64_t children;
+            bool is_articulation;
+            bool entered;
+        };
         
-        const size_t neib_cnt = adj_cnt_[vertex].size();
-
-        for (size_t i = 0; i < neib_cnt; ++i) {
-            const Vertex neighbor = GetVertex(adj_cnt_[vertex][i]);
-            const Vertex cnt = GetCnt(adj_cnt_[vertex][i]);
+        utils_.stack.emplace_back(start, parent, 0, 1, 0, false, false);
+        
+        while (!utils_.stack.empty()) {
+            Utils::StackFrame& frame = utils_.stack.back();
+            Vertex v = frame.vertex;
             
-            if (neighbor == parent) {
+            if (!frame.entered) {
+                cache_.components[v] = cache_.n_components;
+                utils_.tin[v] = utils_.fup[v] = utils_.timer++;
+                frame.entered = true;
+            }
+            
+            const auto& neighbors = adj_cnt_[v];
+            const size_t neib_cnt = neighbors.size();
+            
+            bool pushed_child = false;
+            while (frame.next_ind < neib_cnt) {
+                const Vertex neighbor = GetVertex(neighbors[frame.next_ind]);
+                const uint64_t edge_cnt = GetCnt(neighbors[frame.next_ind]);
+                ++frame.next_ind;
+                
+                if (neighbor == frame.parent) {
+                    continue;
+                }
+                
+                if (utils_.tin[neighbor] == -1) {
+                    utils_.stack.emplace_back(neighbor, v, 0, edge_cnt, 0, false, false);
+                    pushed_child = true;
+                    break;
+                }
+                else {
+                    utils_.has_cycle = true;
+                    utils_.fup[v] = std::min(utils_.fup[v], utils_.tin[neighbor]);
+                }
+            }
+            
+            if (pushed_child) {
                 continue;
             }
             
-            if (utils_.tin[neighbor] == -1) {
-                dfsCombined(neighbor, vertex);
-                ++children;
-
-                if (cnt > 1) {
+            utils_.stack.pop_back();
+            
+            if (!utils_.stack.empty()) {
+                Utils::StackFrame& parent_frame = utils_.stack.back();
+                Vertex p = parent_frame.vertex;
+                const uint64_t edge_cnt = frame.edge_cnt_from_parent;
+                
+                if (edge_cnt > 1) {
                     utils_.has_cycle = true;
                 }
-
-                utils_.fup[vertex] = std::min(utils_.fup[vertex], utils_.fup[neighbor]);
-                if (cnt == 1 && utils_.fup[neighbor] > utils_.tin[vertex]) {
-                    Vertex src = std::min(vertex, neighbor);
-                    Vertex dst = std::max(vertex, neighbor);
+                
+                utils_.fup[p] = std::min(utils_.fup[p], utils_.fup[v]);
+                
+                if (edge_cnt == 1 && utils_.fup[v] > utils_.tin[p]) {
+                    Vertex src = std::min(p, v);
+                    Vertex dst = std::max(p, v);
                     cache_.bridges.emplace_back(src, dst);
                 }
-
-                if (utils_.fup[neighbor] >= utils_.tin[vertex] && parent != VERTEX_POISON) {
-                    is_articulation_point = true;
+                
+                if (utils_.fup[v] >= utils_.tin[p] && parent_frame.parent != VERTEX_POISON) {
+                    parent_frame.is_articulation = true;
                 }
+                
+                ++parent_frame.children;
             }
             else {
-                utils_.has_cycle = true;
-                utils_.fup[vertex] = std::min(utils_.fup[vertex], utils_.tin[neighbor]);
+                if (frame.children > 1) {
+                    frame.is_articulation = true;
+                }
             }
-        }
-
-        if (parent == VERTEX_POISON && children > 1) {
-            is_articulation_point = true;
-        }
-
-        if (is_articulation_point) {
-            cache_.articulation_points.push_back(vertex);
+            
+            if (frame.is_articulation) {
+                cache_.articulation_points.push_back(v);
+            }
         }
     }
 
@@ -332,6 +384,7 @@ private:
 
 };
 
+
 // static_assert(traits::Vertex<CommonGraph::Vertex>);
 // static_assert(traits::Edge<CommonGraph::Edge>);
 // static_assert(traits::DirectionalGraph<DirectionalGraph>);
@@ -354,7 +407,7 @@ bool CommonGraph::has(CommonGraph::Edge edge) const {
     if (edge.src >= adj_.size() || edge.dst >= adj_.size()) {
         return false;
     }
-    return std::binary_search(adj_[edge.src].begin(), adj_[edge.src].end(), edge.dst);
+    return std::find(adj_[edge.src].begin(), adj_[edge.src].end(), edge.dst) != adj_[edge.src].end();
 }
 
 const std::vector<CommonGraph::Vertex>& CommonGraph::getAdjuscent(
@@ -384,62 +437,34 @@ bool PlainGraph::addEdge(PlainGraph::Vertex src, PlainGraph::Vertex dst) {
         return false;
     }
 
-    {
-        auto& src_neighbors = adj_[src];
+    adj_[src].push_back(dst);
     
-        const auto dst_it = std::lower_bound(src_neighbors.begin(), src_neighbors.end(), dst);
-
-        auto& src_neighbors_cnt = adj_cnt_[src];
-
-        const auto dst_it_cnt = std::lower_bound(
-            src_neighbors_cnt.begin(), 
-            src_neighbors_cnt.end(), 
-            dst,  
-            [](const auto& first, const auto& second){
-                return GetVertex(first) < GetVertex(second);
-            }
-        );
-
-        
-        if (dst_it_cnt != src_neighbors_cnt.end() && GetVertex(*dst_it_cnt) == dst) {
-            const size_t dst_cnt_ind = dst_it_cnt - src_neighbors_cnt.begin();
-            SetCnt(src_neighbors_cnt[dst_cnt_ind], GetCnt(*dst_it_cnt) + 1);
+    bool found = false;
+    for (auto& entry : adj_cnt_[src]) {
+        if (GetVertex(entry) == dst) {
+            SetCnt(entry, GetCnt(entry) + 1);
+            found = true;
+            break;
         }
-        else {
-            src_neighbors_cnt.insert(dst_it_cnt, MakeVertexCnt(dst, 1));
-        }
-    
-        src_neighbors.insert(dst_it, dst);
-    } 
-
-    {
-        auto& dst_neighbors = adj_[dst];
-    
-        const auto src_it = std::lower_bound(dst_neighbors.begin(), dst_neighbors.end(), src);
-
-        auto& dst_neighbors_cnt = adj_cnt_[dst];
-
-        const auto src_it_cnt = std::lower_bound(
-            dst_neighbors_cnt.begin(), 
-            dst_neighbors_cnt.end(), 
-            src,  
-            [](const auto& first, const auto& second){
-                return GetVertex(first) < GetVertex(second);
-            }
-        );
-
-        
-        if (src_it_cnt != dst_neighbors_cnt.end() && GetVertex(*src_it_cnt) == src) {
-            const size_t src_cnt_ind = src_it_cnt - dst_neighbors_cnt.begin();
-            SetCnt(dst_neighbors_cnt[src_cnt_ind], GetCnt(*src_it_cnt) + 1);
-        }
-        else {
-            dst_neighbors_cnt.insert(src_it_cnt, MakeVertexCnt(src, 1));
-        }
-    
-        dst_neighbors.insert(src_it, src);
+    }
+    if (!found) {
+        adj_cnt_[src].push_back(MakeVertexCnt(dst, 1));
     }
 
+    adj_[dst].push_back(src);
+    
+    found = false;
+    for (auto& entry : adj_cnt_[dst]) {
+        if (GetVertex(entry) == src) {
+            SetCnt(entry, GetCnt(entry) + 1);
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        adj_cnt_[dst].push_back(MakeVertexCnt(src, 1));
+    }
+    
     ++edges_cnt_;
 
     cache_.is_valid = false;
@@ -457,10 +482,10 @@ PlainGraph::ErrorCode PlainGraph::validate() const {
     for (Vertex vertex = 0; vertex < vertexes_cnt; ++vertex) {
         const auto& neighbors = adj_[vertex];
         
-        // Список смежности должен быть отсортирован
-        if (!std::is_sorted(neighbors.begin(), neighbors.end())) {
-            return ErrorCode::NotSortedNeighbours;
-        }
+        // // Список смежности должен быть отсортирован
+        // if (!std::is_sorted(neighbors.begin(), neighbors.end())) {
+        //     return ErrorCode::NotSortedNeighbours;
+        // }
 
         // Все соседи должны быть валидными вершинами [0, n)
         for (Vertex neighbor : neighbors) {

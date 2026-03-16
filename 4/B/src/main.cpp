@@ -10,63 +10,6 @@
 #include <string>
 #include <iostream>
 
-// #include <concepts>
-
-// namespace traits {
-//     template<class T>
-//     concept Vertex = std::same_as<uint64_t, T>;
-
-//     template<class T>
-//     concept Edge = Vertex<typename T::Vertex> && requires(T e) {
-//         { e.src } -> std::same_as<typename T::Vertex&>;
-//         { e.dst } -> std::same_as<typename T::Vertex&>;
-//     };
-
-//     namespace detail {
-//         template <typename T, typename InnerType>
-//         concept rangeOf = std::ranges::range<T> && std::same_as<std::ranges::range_value_t<T>, InnerType>;
-//     }
-
-//     template<class T>
-//     concept CommonGraph = std::regular<T> && Vertex<typename T::Vertex> && Edge<typename T::Edge> && std::same_as<typename T::Vertex, typename T::Edge::Vertex> &&
-//     requires(T g, const T& cg, typename T::Edge e, typename T::Vertex v) {
-//         { g.addVertex()        } -> std::same_as<typename T::Vertex>; // Return new vertex
-//         { g.addEdge(v, v)      } -> std::same_as<bool>;               // Return false in case of any error.
-
-//         { cg.nVertices()       } -> std::same_as<size_t>;
-//         { cg.nEdges()          } -> std::same_as<size_t>;
-//         { cg.has(e)            } -> std::same_as<bool>;
-//         { cg.getAdjuscent(v)   } -> detail::rangeOf<typename T::Vertex>;
-
-//         cg.validate();
-//         cg.dump((const char*)nullptr); // Dump to file.
-//     };
-
-//     template<class T>
-//     concept PlainGraph = CommonGraph<T> &&
-//     requires(const T& cg) {
-//         { cg.isTree()                } -> std::same_as<bool>;
-//         { cg.isForest()              } -> std::same_as<bool>;
-//         { cg.nJointComponents()      } -> std::same_as<size_t>;
-//         { cg.getJointComponents()    } -> detail::rangeOf<uint64_t>; // Id of component corresponding vertex belong to
-//         { cg.getBridges()            } -> detail::rangeOf<typename T::Edge>;
-//         { cg.getArticulationPoints() } -> detail::rangeOf<typename T::Vertex>;
-//     };
-
-//     template<class T>
-//     concept DirectionalGraph = CommonGraph<T> &&
-//     requires(const T& cg) {
-//         { cg.isDAG()       } -> std::same_as<bool>;
-//         { cg.getSources()  } -> detail::rangeOf<typename T::Vertex>;
-//         { cg.getSinks()    } -> detail::rangeOf<typename T::Vertex>;
-
-//         { cg.reverse()     } -> std::same_as<T>; // Reverse all edges (vertices must be the same)
-//         { cg.topological() } -> detail::rangeOf<typename T::Vertex>; //Range of all vertices sorted topologically
-//         { cg.condense()    } -> std::same_as<std::pair<T, std::vector<typename T::Vertex>>>; // Condensed graph + mapping of vertices from old graph to new one
-
-//     };
-// };
-
 class CommonGraph {
 
 public:
@@ -120,6 +63,7 @@ public:
 
 protected:
 
+    // Список смежности
     mutable std::vector<std::vector<Vertex>> adj_;
     size_t edges_cnt_ = 0;
 
@@ -142,15 +86,17 @@ public:
 
 public:
 
-    [[nodiscard]]           bool                           isTree                      ()                                      const                                   ;
-    [[nodiscard]]           bool                           isForest                    ()                                      const                                   ;
-    [[nodiscard]]           size_t                         nJointComponents            ()                                      const                                   ;
-    [[nodiscard]]           const std::vector<Component>&  getJointComponents          ()                                      const                                   ;
-    [[nodiscard]]           const std::vector<Edge>&       getBridges                  ()                                      const                                   ;
-    [[nodiscard]]           const std::vector<Vertex>&     getArticulationPoints       ()                                      const                                   ;
+    [[nodiscard]]   bool                            isTree                      ()                                      const                                   ;
+    [[nodiscard]]   bool                            isForest                    ()                                      const                                   ;
+    [[nodiscard]]   size_t                          nJointComponents            ()                                      const                                   ;
+    [[nodiscard]]   const std::vector<Component>&   getJointComponents          ()                                      const                                   ;
+    [[nodiscard]]   const std::vector<Edge>&        getBridges                  ()                                      const                                   ;
+    [[nodiscard]]   const std::vector<Vertex>&      getArticulationPoints       ()                                      const                                   ;
 
 private:
 
+
+    // Проверка на мультиребро, используем инвариант, что храним соседей отсортированно
     bool isMultiEdge(Vertex u, Vertex v) const noexcept {
         const auto& adj_u = adj_[u];
         auto it = std::lower_bound(adj_u.begin(), adj_u.end(), v);
@@ -159,6 +105,7 @@ private:
         return (it + 1 != adj_u.end() && *(it + 1) == v);
     }
 
+    // Сортируем только когда нужно чекать MultiEdge
     mutable bool is_sorted_ = false;
 
     struct Cache {
@@ -168,7 +115,7 @@ private:
         std::vector<Component> components;
         std::vector<Edge> bridges;
         std::vector<Vertex> articulation_points;
-        bool is_valid = false;
+        bool is_valid = false; // Нужно ли пересчитывать закешированные данные
 
         void reset(size_t n) {
             is_tree = true;
@@ -182,19 +129,19 @@ private:
     } mutable cache_;
 
     struct Utils {
-        std::vector<int64_t> tin;
-        std::vector<int64_t> fup;
-        int64_t timer = 0;
+        std::vector<int64_t> tin; // время входа в ноду
+        std::vector<int64_t> fup; // вспомогательный массив минимумов времени входа для нахождения мостов и точек сочленения
+        int64_t timer = 0; // счётчик времени входа
         bool has_cycle = false;
 
         struct StackFrame {
-            uint32_t vertex;
-            uint32_t parent;
-            size_t next_ind;
-            bool is_multi_edge;
-            int32_t children;
-            bool is_articulation;
-            bool entered;
+            uint32_t vertex; // текущая нода
+            uint32_t parent; // родитель текущей ноды
+            size_t next_ind; // индекс следующего соседа в adj_[vertex]
+            bool is_multi_edge; // мульти ребро или нет
+            int32_t children; // количество детей vertex
+            bool is_articulation; // флаг ан проверку того, что это точка сочленения (потому что нужно отдельно обрабаывать корень)
+            bool entered; // флаг на стартовую инициализацию, когда ещё не начали обходить соседей
         };
 
         std::vector<StackFrame> stack;
@@ -215,14 +162,14 @@ private:
 
         cache_.reset(n);
 
-        if (n == 0) {
+        if (n == 0) { // дефолтные значения кеша корректны для пустого графа
             cache_.is_valid = true;
             return;
         }
 
         utils_.reset(n);
 
-        if (!is_sorted_) {
+        if (!is_sorted_) { // Если соседи неотсортированы, то сортируем
             for (std::vector<Vertex>& neibs: adj_) {
                 std::sort(neibs.begin(), neibs.end());
             }
@@ -245,14 +192,15 @@ private:
     }
 
     void dfsCombined(Vertex start, Vertex parent) const {
-        
-        utils_.stack.emplace_back(start, parent, 0, isMultiEdge(start, parent), 0, false, false);
+
+        //стартовая вершина
+        utils_.stack.emplace_back(start, parent, 0, isMultiEdge(start, parent), 0, false, false); 
         
         while (!utils_.stack.empty()) {
             Utils::StackFrame& frame = utils_.stack.back();
             Vertex v = frame.vertex;
             
-            if (!frame.entered) {
+            if (!frame.entered) { // ещё не начали обходить соседей
                 cache_.components[v] = cache_.n_components;
                 utils_.tin[v] = utils_.fup[v] = utils_.timer++;
                 frame.entered = true;
@@ -261,40 +209,42 @@ private:
             const auto& neighbors = adj_[v];
             const size_t neib_cnt = neighbors.size();
             
-            bool pushed_child = false;
+            bool pushed_child = false; // в стэк добавлен новый фрейм
             while (frame.next_ind < neib_cnt) {
                 const Vertex neighbor = neighbors[frame.next_ind];
-                do {
+                do { // скипаем мульти рёбра, чтобы лишний раз по ним не ходить
                     ++frame.next_ind;
                 } while (frame.next_ind < neib_cnt && neighbors[frame.next_ind] == neighbor);
                 
-                if (neighbor == frame.parent) {
+                if (neighbor == frame.parent) { // если это ребро в родителя. то не обрабатываем
                     continue;
                 }
                 
-                if (utils_.tin[neighbor] == -1) {
+                if (utils_.tin[neighbor] == -1) { // сосед ещё не посещён
                     utils_.stack.emplace_back(neighbor, v, 0, isMultiEdge(v, neighbor), 0, false, false);
                     pushed_child = true;
                     break;
                 }
-                else {
+                else { // сосед уже посещён
                     utils_.has_cycle = true;
                     utils_.fup[v] = std::min(utils_.fup[v], utils_.tin[neighbor]);
                 }
             }
             
-            if (pushed_child) {
+            if (pushed_child) { // в стэк добавлен новый фрейм
                 continue;
             }
             
-            utils_.stack.pop_back();
+            utils_.stack.pop_back(); 
             
-            if (!utils_.stack.empty()) {
+            // постобработка 
+
+            if (!utils_.stack.empty()) { // не корень
                 Utils::StackFrame& parent_frame = utils_.stack.back();
                 Vertex p = parent_frame.vertex;
                 const bool is_multi_edge = frame.is_multi_edge;
                 
-                if (is_multi_edge) {
+                if (is_multi_edge) { // петля
                     utils_.has_cycle = true;
                 }
                 
@@ -304,13 +254,13 @@ private:
                     cache_.bridges.emplace_back(v, p);
                 }
                 
-                if (utils_.fup[v] >= utils_.tin[p] && parent_frame.parent != VERTEX_POISON) {
+                if (utils_.fup[v] >= utils_.tin[p]) { // уже гарантируется что не корень
                     parent_frame.is_articulation = true;
                 }
                 
                 ++parent_frame.children;
             }
-            else {
+            else { // корень
                 if (frame.children > 1) {
                     frame.is_articulation = true;
                 }
@@ -347,9 +297,9 @@ public:
 private:
 
     enum VertexColor: uint8_t {
-        White   = 0,
-        Gray    = 1,
-        Black   = 2
+        White   = 0, // ещё не встречалаь
+        Gray    = 1, // сейчас обрабатывается
+        Black   = 2  // уже обработана
     };
 
                             bool                    hasCycleHelper              (Vertex vertex, 
@@ -426,7 +376,7 @@ bool PlainGraph::addEdge(PlainGraph::Vertex src, PlainGraph::Vertex dst) {
     ++edges_cnt_;
 
     cache_.is_valid = false;
-    is_sorted_ = false;
+    is_sorted_ = false; // сортировать будем, как понадобиться, при обновлении кэша
 
     return true;
 }
@@ -440,11 +390,6 @@ PlainGraph::ErrorCode PlainGraph::validate() const {
     
     for (Vertex vertex = 0; vertex < vertexes_cnt; ++vertex) {
         const auto& neighbors = adj_[vertex];
-        
-        // // Список смежности должен быть отсортирован
-        // if (!std::is_sorted(neighbors.begin(), neighbors.end())) {
-        //     return ErrorCode::NotSortedNeighbours;
-        // }
 
         // Все соседи должны быть валидными вершинами [0, n)
         for (Vertex neighbor : neighbors) {
@@ -673,6 +618,7 @@ catch (...) {
 //--------------------------------------------------------------------------------------------------
 
 bool DirectionalGraph::isDAG() const {
+    // проверка на кратные рёбра
     for (Vertex vertex = 0; vertex < nVertices(); ++vertex) {
         if (std::binary_search(adj_[vertex].begin(), adj_[vertex].end(), vertex)) {
             return false;
@@ -740,6 +686,8 @@ DirectionalGraph DirectionalGraph::reverse() const {
     return graph;
 }
 
+// Проходимся в глубину и на выходе пуши в вектор. То есть по факту сортируем по времени выхода. 
+// Ещё заодно проверяем на DAG, иначе нельзя построить топологическую сортировку
 std::vector<DirectionalGraph::Vertex> DirectionalGraph::topological() const {
     std::vector<VertexColor> colors(nVertices(), VertexColor::White);
     std::vector<Vertex> topological;
@@ -756,6 +704,9 @@ std::vector<DirectionalGraph::Vertex> DirectionalGraph::topological() const {
     return topological;
 }
 
+// В порядке топсорта будем идти по вершинам и искать компоненты сильной связности, для этого будем ходить по развёрнотому графу. 
+// На самом деле не топсорт, а сортировка по времени выхода, потому что строго говоря топсорта не существует для не DAG-ов, 
+// а конденсация - существует.
 std::pair<DirectionalGraph, std::vector<DirectionalGraph::Vertex>> DirectionalGraph::condense() const {
     const DirectionalGraph reverse_graph(reverse());
     const std::vector<Vertex> tout_sort(toutSort());
@@ -772,6 +723,8 @@ std::pair<DirectionalGraph, std::vector<DirectionalGraph::Vertex>> DirectionalGr
         }
     }
 
+    // Чтобы проставить рёбра пройдёмся по всем вершинам исходного графа, посмотрим всех соседей. 
+    // Если они из разных КСС, то вставляем это ребро
     for (Vertex vertex = 0; vertex < nVertices(); ++vertex) {
         for (Vertex neighbour: getAdjuscent(vertex)) {
             const Vertex vertex_component_num = vertex_component[vertex];

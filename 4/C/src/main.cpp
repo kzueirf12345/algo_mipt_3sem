@@ -1,4 +1,3 @@
-#include <cstdint>
 #include <iostream>
 #include <limits>
 #include <vector>
@@ -67,15 +66,11 @@ int64_t calcManhattanDistance(int64_t x1, int64_t y1, int64_t x2, int64_t y2) {
     return std::abs(x1 - x2) + std::abs(y1 - y2);
 }
 
-int64_t calculateScore(int64_t durability, int64_t distance, int64_t pickaxeDurability) {
+int64_t calculateScore(int64_t durability, int64_t distance) {
     if (durability == 0) {
         return HEURISTIC_ZERO_DURABILITY_BONUS;
     }
-    // int64_t riskRatio = (durability * 100 * 1000) / pickaxeDurability;
-
-    int64_t score = (durability * HEURISTIC_WEIGHT_DURABILITY) + (distance * HEURISTIC_WEIGHT_DISTANCE);
-
-    return score;
+    return (durability * HEURISTIC_WEIGHT_DURABILITY) + (distance * HEURISTIC_WEIGHT_DISTANCE);
 }
 
 int main() {
@@ -121,12 +116,11 @@ int main() {
         int64_t bestScore = std::numeric_limits<int64_t>::max();
 
         for (std::size_t i = 0; i < frontier.size(); ++i) {
-            if (frontier[i].durability > pickaxeDurability 
-             || pickaxeDurability - frontier[i].durability < frontier[i].dist_to_base) {
+            if (frontier[i].durability > pickaxeDurability) {
                 continue;
             }
 
-            int64_t score = calculateScore(frontier[i].durability, frontier[i].dist_to_base, pickaxeDurability);
+            int64_t score = calculateScore(frontier[i].durability, frontier[i].dist_to_base);
 
             if (frontier[i].durability == 0) {
                 bestIndex = (int64_t)i;
@@ -168,6 +162,11 @@ int main() {
             
             int64_t nx = chosen.x + dx_neighbors[i];
             int64_t ny = chosen.y + dy_neighbors[i];
+
+            if (nx == baseX && ny == baseY) {
+                std::cout << nx << " " << ny << std::endl;
+                return EXIT_SUCCESS;
+            }
 
             if (!visited.contains(nx, ny)) {
                 Candidate c;

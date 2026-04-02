@@ -4,10 +4,10 @@
 #include <cmath>
 #include <cstdlib>
 
-const int64_t HEURISTIC_WEIGHT_DISTANCE = 25;
-const int64_t HEURISTIC_WEIGHT_DURABILITY = 5;
-const int64_t HEURISTIC_ZERO_DURABILITY_BONUS = -2281337;
-const int64_t HASH_MAP_SIZE = 10007;
+constexpr int64_t HEURISTIC_WEIGHT_DISTANCE = 25;
+constexpr int64_t HEURISTIC_WEIGHT_DURABILITY = 5;
+constexpr int64_t HEURISTIC_ZERO_DURABILITY_BONUS = -2281337;
+constexpr int64_t HASH_MAP_SIZE = 10007;
 
 struct Coord {
     int64_t x;

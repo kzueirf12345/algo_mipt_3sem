@@ -187,7 +187,6 @@ public:
                                  : static_cast<uint64_t>(-val);
 
             digits = {static_cast<uint32_t>(abs_v & 0xFFFFFFFF), static_cast<uint32_t>(abs_v >> 32)};
-
         } 
         else {
             const uint64_t abs_v = val;
